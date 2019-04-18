@@ -1,14 +1,10 @@
-### Download dependencies ###
 hunter_add_package(GTest)
 
-### Find dependencies ###
 find_package(GTest CONFIG REQUIRED) # GTest::main
 
-### Targets ###
 add_executable(example_test example_test.cc)
 target_link_libraries(example_test PUBLIC GTest::main)
 
-### Testing ###
 enable_testing()
 
 if(IOS)

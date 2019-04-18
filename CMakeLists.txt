@@ -9,12 +9,23 @@ HunterGate(
 
 project(MaceKit)
 
-option(MACEKIT_UNIT_TESTS "whether to build unit tests" ON)
+option(MACEKIT_BUILD_TESTS     "whether to build unit tests" ON)
+option(MACEKIT_BUILD_BENCHMARK "whether to build micro benchmarks" ON)
 
 # TODO add cross toolchain with Polly: https://github.com/ruslo/polly
 
-#add_subdirectory(src)
-if (MACEKIT_UNIT_TESTS)
+add_definitions(-std=c++11)
+
+# Download dependencies
+hunter_add_package(gflags)
+find_package(gflags CONFIG REQUIRED)
+
+
+add_subdirectory(src)
+if (MACEKIT_BUILD_TESTS)
   add_subdirectory(test/cc)
+endif()
+if (MACEKIT_BUILD_BENCHMARK)
+  add_subdirectory(benchmark)
 endif()
 
