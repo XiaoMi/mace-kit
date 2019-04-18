@@ -23,9 +23,9 @@ find_package(gflags CONFIG REQUIRED)
 
 add_subdirectory(src)
 if (MACEKIT_BUILD_TESTS)
-  add_subdirectory(test/cc)
+  add_subdirectory(test/cpp)
 endif()
 if (MACEKIT_BUILD_BENCHMARK)
-  add_subdirectory(benchmark)
+  add_subdirectory(test/benchmark)
 endif()
 
