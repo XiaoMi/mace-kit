@@ -1,4 +1,5 @@
-add_executable(util ssd_bbox.cc)
+add_library(util STATIC ssd_bbox.cc)
+
 if (GFLAGS_USE_TARGET_NAMESPACE)
   if (TARGET gflags::gflags)
     target_link_libraries(util gflags::gflags)

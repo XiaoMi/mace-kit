@@ -20,7 +20,7 @@ add_definitions(-std=c++11)
 hunter_add_package(gflags)
 find_package(gflags CONFIG REQUIRED)
 
-
+include_directories(include)
 add_subdirectory(src)
 if (MACEKIT_BUILD_TESTS)
   add_subdirectory(test/cpp)

@@ -27,11 +27,26 @@ class SSDBbox {
   ~SSDBbox();
 
   // Decode single feature layer localization regression output.
-  // `feature_localization` is regressed output localization. Its size
+  // Decoding process should be reversely consistent with encoding process.
+  // So we might want to make minor modification to ajust this method
+  // according to different encoding implementation.
+  //
+  // `feature_localization`: regressed output localization. Its size
   // should be `feature_size` x anchor_count x 4 (cy, cx, h, w).
   // `feature_size` equals to number of pixels for this feature layer.
-  // `anchor_shapes` contains all the shape (height, width) of different
+  //
+  // `feature_shape`: height and width of this feature layer.
+  //
+  // `img_shape`: height and width of original image.
+  //
+  // `step`: down-sample times from img_shape to feature_shape.
+  // If it is set to 0, we use float(img_shape[0] / feature_shape[0])
+  //
+  //
+  // `anchor_shapes`: contains all the shape (height, width) of different
   // anchors according to anchor size and anchor ratio set during training.
+  // It can be calculated by calling `GetAnchorsShape`.
+  //
   // `prior_scaling` is hyperparameter for encode width and height of bboxes.
   //
   // Encoding formula:
@@ -56,9 +71,12 @@ class SSDBbox {
   // and output should be clipped within [0, 1]
   //
   void Decode(float *feature_localization,
-              int64_t feature_size,
+              const std::vector<int64_t> &feature_shape,
+              const std::vector<int64_t> &img_shape,
+              int step,
               const std::vector<std::vector<float>> &anchor_shapes,
-              const std::vector<float> &prior_scaling);
+              const std::vector<float> &prior_scaling,
+              float offset = 0.5f);
 
   // Get anchor bboxes height and with for a feature layer.
   void GetAnchorsShape(int64_t img_height, int64_t img_width,
@@ -70,14 +88,14 @@ class SSDBbox {
   // second, do nms.
   void SelectTopAndNMS(const float *scores,
                        const float *localization,
-                       float *output_scores,
-                       float *output_localization,
+                       int64_t anchor_count,
+                       std::vector<float> *output_scores,
+                       std::vector<float> *output_localization,
                        int64_t top_k = -1,
                        float nms_threshold = 0.45);
 
- private:
-  float CalJaccard(const std::vector<float> &lhs,
-                   const std::vector<float> &rhs);
+  float CalJaccard(const float *lhs,
+                   const float *rhs);
 };
 
 }  // namespace util
