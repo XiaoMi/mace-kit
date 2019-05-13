@@ -29,18 +29,6 @@ SSDBbox::~SSDBbox() {
 
 }
 
-// `feature_localization`: regressed output localization. Its size
-// should be `feature_size` x anchor_count x 4 (cy, cx, h, w).
-//
-// This implies decoding formula:
-// g(cx) = d(cx) + g^(cx) * d(w) * prior_scaling(cx)
-// g(cy) = d(cy) + g^(cy) * d(h) * prior_scaling(cy)
-// g(w) = exp[g^(w) * d(w) * prior_scaling(w)]
-// g(h) = exp[g^(h) * d(h) * prior_scaling(h)]
-//
-// So final decoded bbox location should be:
-// [g(cy) - g(h) / 2, g(cx) - g(w) / 2, g(cy) + g(h) / 2, g(cx) + g(w) / 2]
-//
 void SSDBbox::Decode(float *feature_localization,
                      const std::vector<int64_t> &feature_shape,
                      const std::vector<int64_t> &img_shape,
