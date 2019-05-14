@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_SRC_UTIL_SSD_BBOX_H_
-#define MACEKIT_SRC_UTIL_SSD_BBOX_H_
+#ifndef MACEKIT_INCLUDE_SSD_BBOX_H_
+#define MACEKIT_INCLUDE_SSD_BBOX_H_
 
 #include <cstdint>
 #include <vector>
@@ -70,28 +70,29 @@ class SSDBbox {
   // Note: feature_localization should be both input and output,
   // and output should be clipped within [0, 1]
   //
-  void Decode(float *feature_localization,
-              const std::vector<int64_t> &feature_shape,
-              const std::vector<int64_t> &img_shape,
+  void Decode(const float *feature_localizations,
+              const std::vector<int> &feature_shape,
+              const std::vector<int> &img_shape,
               int step,
               const std::vector<std::vector<float>> &anchor_shapes,
               const std::vector<float> &prior_scaling,
+              float *output_localizations,
               float offset = 0.5f);
 
-  // Get anchor bboxes height and with for a feature layer.
-  void GetAnchorsShape(int64_t img_height, int64_t img_width,
-                       int64_t min_size, int64_t max_size,
+  // Get anchor bboxes height and width for a feature layer.
+  void GetAnchorsShape(int img_height, int img_width,
+                       int min_size, int max_size,
                        const std::vector<float> &anchor_ratios,
                        std::vector<std::vector<float>> *anchor_shapes);
 
   // First, select predicted bboxes with top-k scores,
   // second, do nms.
   void SelectTopAndNMS(const float *scores,
-                       const float *localization,
-                       int64_t anchor_count,
+                       const float *localizations,
+                       int anchor_count,
                        std::vector<float> *output_scores,
-                       std::vector<float> *output_localization,
-                       int64_t top_k = -1,
+                       std::vector<std::vector<float>> *output_localizations,
+                       int top_k = -1,
                        float nms_threshold = 0.45);
 
   float CalJaccard(const float *lhs,
@@ -101,4 +102,4 @@ class SSDBbox {
 }  // namespace util
 }  // namespace mace_kit
 
-#endif  // MACEKIT_SRC_UTIL_SSD_BBOX_H_
+#endif  // MACEKIT_INCLUDE_SSD_BBOX_H_

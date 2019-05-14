@@ -1,12 +1,11 @@
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../src)
 
 hunter_add_package(GTest)
-
 find_package(GTest CONFIG REQUIRED) # GTest::main
 
 add_executable(util_test ssd_bbox_test.cc)
 target_link_libraries(util_test PUBLIC GTest::main)
-target_link_libraries(util_test PUBLIC util)
+target_link_libraries(util_test PRIVATE util)
 
 enable_testing()
 

@@ -1,4 +1,4 @@
-add_executable(example example.cc)
+add_executable(example example.cc ../../include/macekit/mat.h ../core/mat.cc)
 if (GFLAGS_USE_TARGET_NAMESPACE)
   if (TARGET gflags::gflags)
     target_link_libraries(example gflags::gflags)

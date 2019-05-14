@@ -56,7 +56,7 @@ TEST_F(SSDBboxTest, TestNMS) {
       0.2, 0.2, 2.2, 2.2
   };
   std::vector<float> output_scores;
-  std::vector<float> output_localization;
+  std::vector<std::vector<float>> output_localization;
   ssd_bbox_.SelectTopAndNMS(scores,
                             localization,
                             3,
@@ -65,8 +65,9 @@ TEST_F(SSDBboxTest, TestNMS) {
                             2,
                             0.45);
   std::vector<float> expected_output_scores{2, 3};
-  std::vector<float> expected_output_localization{
-      1, 1, 3, 3, 0.2, 0.2, 2.2, 2.2
+  std::vector<std::vector<float>> expected_output_localization{
+      {1, 1, 3, 3},
+      {0.2, 0.2, 2.2, 2.2}
   };
 
   EXPECT_EQ(2, output_scores.size());
@@ -74,7 +75,11 @@ TEST_F(SSDBboxTest, TestNMS) {
     EXPECT_NEAR(expected_output_scores[i], output_scores[i], 1e-3);
   }
   for (int i = 0; i == expected_output_localization.size(); i++) {
-    EXPECT_NEAR(expected_output_localization[i], output_localization[i], 1e-3);
+    for (int j = 0; j < 4; j++) {
+      EXPECT_NEAR(expected_output_localization[i][j],
+                  output_localization[i][j],
+                  1e-3);
+    }
   }
 }
 

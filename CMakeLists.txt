@@ -20,6 +20,7 @@ add_definitions(-std=c++11)
 hunter_add_package(gflags)
 find_package(gflags CONFIG REQUIRED)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(include)
 add_subdirectory(src)
 if (MACEKIT_BUILD_TESTS)

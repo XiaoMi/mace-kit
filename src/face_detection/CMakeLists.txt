@@ -1,0 +1,25 @@
+hunter_add_package(OpenCV)
+find_package(OpenCV REQUIRED)
+
+message("OpenCV_DIR: ${OpenCV_DIR}")
+message("OpenCV_CONFIG: ${OpenCV_CONFIG}")
+message("OpenCV_LIBS: ${OpenCV_LIBS}")
+
+add_executable(face_detection draw_anchor.cc)
+target_link_libraries(face_detection util)
+
+if (GFLAGS_USE_TARGET_NAMESPACE)
+  if (TARGET gflags::gflags)
+    target_link_libraries(face_detection gflags::gflags)
+  else ()
+    message(FATAL_ERROR "gflags::gflags target not defined")
+  endif ()
+else ()
+  if (TARGET gflags)
+    target_link_libraries(face_detection gflags)
+  else ()
+    message(FATAL_ERROR "gflags target not defined")
+  endif ()
+endif ()
+
+target_link_libraries(face_detection ${OpenCV_LIBS})

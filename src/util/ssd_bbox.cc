@@ -29,20 +29,23 @@ SSDBbox::~SSDBbox() {
 
 }
 
-void SSDBbox::Decode(float *feature_localization,
-                     const std::vector<int64_t> &feature_shape,
-                     const std::vector<int64_t> &img_shape,
+void SSDBbox::Decode(const float *feature_localizations,
+                     const std::vector<int> &feature_shape,
+                     const std::vector<int> &img_shape,
                      int step,
                      const std::vector<std::vector<float>> &anchor_shapes,
                      const std::vector<float> &prior_scaling,
+                     float *output_localizations,
                      float offset) {
   float step_scale = step == 0 ? 1.0f * img_shape[0] / feature_shape[0] : step;
   int anchor_count = anchor_shapes.size();
 
-  for (int64_t h = 0; h < feature_shape[0]; h++) {
-    for (int64_t w = 0; w < feature_shape[1]; w++) {
-      float *feature_data =
-          feature_localization + (h * feature_shape[1] + w) * anchor_count * 4;
+  for (int h = 0; h < feature_shape[0]; h++) {
+    for (int w = 0; w < feature_shape[1]; w++) {
+      const float *feature_data =
+          feature_localizations + (h * feature_shape[1] + w) * anchor_count * 4;
+      float *output_data =
+          output_localizations + (h * feature_shape[1] + w) * anchor_count * 4;
 
       for (int anchor_idx = 0; anchor_idx < anchor_count; anchor_idx++) {
         float dh = anchor_shapes[anchor_idx][0];
@@ -55,21 +58,22 @@ void SSDBbox::Decode(float *feature_localization,
         float gh = exp(feature_data[2] * dh * prior_scaling[2]);   // h
         float gw = exp(feature_data[3] * dw * prior_scaling[3]);   // w
 
-        feature_data[0] = std::max(0.f, gcy - gh / 2);
-        feature_data[1] = std::max(0.f, gcx - gw / 2);
-        feature_data[2] = std::min(1.f, gcy + gh / 2);
-        feature_data[3] = std::min(1.f, gcx + gw / 2);
+        output_data[0] = std::max(0.f, gcy - gh / 2);
+        output_data[1] = std::max(0.f, gcx - gw / 2);
+        output_data[2] = std::min(1.f, gcy + gh / 2);
+        output_data[3] = std::min(1.f, gcx + gw / 2);
 
         feature_data += 4;
+        output_data += 4;
       }  // anchor_idx
     }  // w
   }  // h
 }
 
-void SSDBbox::GetAnchorsShape(int64_t img_height,
-                              int64_t img_width,
-                              int64_t min_size,
-                              int64_t max_size,
+void SSDBbox::GetAnchorsShape(int img_height,
+                              int img_width,
+                              int min_size,
+                              int max_size,
                               const std::vector<float> &anchor_ratios,
                               std::vector<std::vector<float>> *anchor_shapes) {
   anchor_shapes->push_back({1.0f * min_size / img_height,
@@ -90,13 +94,14 @@ void SSDBbox::GetAnchorsShape(int64_t img_height,
   }
 }
 
-void SSDBbox::SelectTopAndNMS(const float *scores,
-                              const float *localization,
-                              int64_t anchor_count,
-                              std::vector<float> *output_scores,
-                              std::vector<float> *output_localization,
-                              int64_t top_k,
-                              float nms_threshold) {
+void SSDBbox::SelectTopAndNMS(
+    const float *scores,
+    const float *localization,
+    int anchor_count,
+    std::vector<float> *output_scores,
+    std::vector<std::vector<float>> *output_localization,
+    int top_k,
+    float nms_threshold) {
   std::vector<std::pair<float, int>> scores_with_indices(anchor_count);
   for (int i = 0; i < anchor_count; i++) {
     scores_with_indices[i] = {scores[i], i};
@@ -108,15 +113,17 @@ void SSDBbox::SelectTopAndNMS(const float *scores,
               return lhs.first > rhs.first
                   || (lhs.first == rhs.first && lhs.second < rhs.second);
             });
+  top_k = std::min(top_k, anchor_count);
   std::vector<int> indices(top_k);
   for (int i = 0; i < top_k; i++) {
     indices[i] = scores_with_indices[i].second;
   }
 
   output_scores->push_back(scores[indices[0]]);
-  output_localization->insert(output_localization->end(),
-                              localization,
-                              localization + 4);
+  output_localization->push_back({localization[indices[0]],
+                                  localization[indices[0] + 1],
+                                  localization[indices[0] + 2],
+                                  localization[indices[0] + 3]});
 
   for (int i = 1; i < top_k; i++) {
     bool retain = true;
@@ -132,9 +139,11 @@ void SSDBbox::SelectTopAndNMS(const float *scores,
 
     if (retain) {
       output_scores->push_back(scores[indices[i]]);
-      output_localization->insert(output_localization->end(),
-                                  localization + indices[i] * 4,
-                                  localization + indices[i] * 4 + 4);
+      int offset = indices[i] * 4;
+      output_localization->push_back({localization[offset],
+                                      localization[offset + 1],
+                                      localization[offset + 2],
+                                      localization[offset + 3]});
     }
   }  // i
 }
