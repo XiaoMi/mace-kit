@@ -16,7 +16,7 @@
 #include <cmath>
 #include <algorithm>
 #include <functional>
-#include "macekit/ssd_bbox.h"
+#include "src/util/ssd_bbox.h"
 
 namespace mace_kit {
 namespace util {

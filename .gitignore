@@ -1,3 +1,8 @@
 cmake-build-debug/
+cmake-build/
 build/
 .idea/
+model/
+third_party/mace/include/
+third_party/mace/lib/
+

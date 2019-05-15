@@ -17,7 +17,6 @@
 
 #include <vector>
 #include <memory>
-#include <bits/unique_ptr.h>
 
 namespace mace_kit {
 namespace util {

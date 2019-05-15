@@ -1,14 +1,20 @@
-add_executable(example example.cc ../../include/macekit/mat.h ../core/mat.cc)
-if (GFLAGS_USE_TARGET_NAMESPACE)
-  if (TARGET gflags::gflags)
-    target_link_libraries(example gflags::gflags)
-  else ()
-    message(FATAL_ERROR "gflags::gflags target not defined")
-  endif ()
-else ()
-  if (TARGET gflags)
-    target_link_libraries(example gflags)
-  else ()
-    message(FATAL_ERROR "gflags target not defined")
-  endif ()
-endif ()
+add_executable(example example.cc)
+
+target_link_libraries(example PUBLIC gflags)
+
+if(NOT ANDROID AND NOT WIN32)
+  target_link_libraries(example PUBLIC pthread)
+endif(NOT ANDROID AND NOT WIN32)
+
+
+hunter_add_package(OpenCV)
+find_package(OpenCV REQUIRED)
+message("OpenCV_DIR: ${OpenCV_DIR}")
+message("OpenCV_CONFIG: ${OpenCV_CONFIG}")
+message("OpenCV_LIBS: ${OpenCV_LIBS}")
+
+add_executable(draw_anchor draw_anchor.cc)
+target_link_libraries(draw_anchor ${OpenCV_LIBS})
+
+install(TARGETS draw_anchor RUNTIME DESTINATION bin)
+

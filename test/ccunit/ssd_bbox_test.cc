@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <gtest/gtest.h>
-#include <iostream>
-#include "macekit/ssd_bbox.h"
+#include "gtest/gtest.h"
+#include "src/util/ssd_bbox.h"
 
 namespace mace_kit {
 namespace util {
@@ -40,7 +39,7 @@ TEST_F(SSDBboxTest, TestGetAnchorShape) {
       {0.3016988933062603f, 0.15084944665313013f}
   };
   EXPECT_EQ(expected_anchor_shapes.size(), anchor_shapes.size());
-  for (int i = 0; i < expected_anchor_shapes.size(); i++) {
+  for (size_t i = 0; i < expected_anchor_shapes.size(); i++) {
     EXPECT_NEAR(expected_anchor_shapes[i][0], anchor_shapes[i][0], 1e-3);
     EXPECT_NEAR(expected_anchor_shapes[i][1], anchor_shapes[i][1], 1e-3);
   }
@@ -71,11 +70,11 @@ TEST_F(SSDBboxTest, TestNMS) {
   };
 
   EXPECT_EQ(2, output_scores.size());
-  for (int i = 0; i == expected_output_scores.size(); i++) {
+  for (size_t i = 0; i == expected_output_scores.size(); i++) {
     EXPECT_NEAR(expected_output_scores[i], output_scores[i], 1e-3);
   }
-  for (int i = 0; i == expected_output_localization.size(); i++) {
-    for (int j = 0; j < 4; j++) {
+  for (size_t i = 0; i == expected_output_localization.size(); i++) {
+    for (size_t j = 0; j < 4; j++) {
       EXPECT_NEAR(expected_output_localization[i][j],
                   output_localization[i][j],
                   1e-3);

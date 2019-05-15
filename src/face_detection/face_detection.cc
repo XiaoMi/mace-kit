@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "macekit/face_detection.h"
-#include "macekit/ssd_bbox.h"
+#include "src/util/ssd_bbox.h"
 
 namespace mace_kit {
 namespace util {
@@ -124,7 +124,7 @@ void FaceDetection::Detect(Mat &mat,
 
   result->faces.resize(output_scores.size());
   auto &faces = result->faces;
-  for (int i = 0; i < output_scores.size(); i++) {
+  for (size_t i = 0; i < output_scores.size(); i++) {
     faces[i].score = output_scores[i];
     faces[i].localization = output_localizations[i];
   }

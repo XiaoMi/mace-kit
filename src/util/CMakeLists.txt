@@ -1,15 +1,6 @@
-add_library(util STATIC ssd_bbox.cc)
+set(UTIL_SRCS
+        ssd_bbox.cc
+        )
 
-if (GFLAGS_USE_TARGET_NAMESPACE)
-  if (TARGET gflags::gflags)
-    target_link_libraries(util gflags::gflags)
-  else ()
-    message(FATAL_ERROR "gflags::gflags target not defined")
-  endif ()
-else ()
-  if (TARGET gflags)
-    target_link_libraries(util gflags)
-  else ()
-    message(FATAL_ERROR "gflags target not defined")
-  endif ()
-endif ()
+add_library(util STATIC ${UTIL_SRCS})
+target_link_libraries(util PRIVATE core)
