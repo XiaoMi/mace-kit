@@ -2,8 +2,8 @@ enable_testing()
 
 include(ExternalProject)
 
-set(GTEST_SOURCES_DIR ${MACE_THIRD_PARTY_DIR}/gtest)
-set(GTEST_INSTALL_DIR ${MACE_THIRD_PARTY_DIR}/install/gtest)
+set(GTEST_SOURCES_DIR ${MACEKIT_THIRD_PARTY_DIR}/gtest)
+set(GTEST_INSTALL_DIR ${MACEKIT_THIRD_PARTY_DIR}/install/gtest)
 set(GTEST_INCLUDE_DIR "${GTEST_INSTALL_DIR}/include" CACHE PATH "gtest include directory." FORCE)
 
 include_directories(SYSTEM ${GTEST_INCLUDE_DIR})

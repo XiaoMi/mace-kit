@@ -13,13 +13,133 @@
 // limitations under the License.
 
 #include "macekit/face_detection.h"
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <numeric>
 #include "src/util/ssd_bbox.h"
+#include "mace_engine_factory.h"
 
 namespace mace_kit {
 namespace util {
 
-FaceDetection::FaceDetection(const FaceDetectionContext &context) {
+namespace {
 
+const std::vector<std::string> mace_input_nodes{
+    "input"
+};
+
+const std::vector<std::string> mace_output_nodes{
+    "ssd_mobilenet_v2/layer_8/expansion_output_box/conv_cls/BatchNorm/FusedBatchNorm",
+    "ssd_mobilenet_v2/layer_15/expansion_output_box/conv_cls/BatchNorm/FusedBatchNorm",
+    "ssd_mobilenet_v2/layer_18/output_box/conv_cls/BatchNorm/FusedBatchNorm",
+    "ssd_mobilenet_v2/last_box/conv_cls/BatchNorm/FusedBatchNorm",
+    "ssd_mobilenet_v2/layer_8/expansion_output_box/conv_loc/BatchNorm/FusedBatchNorm",
+    "ssd_mobilenet_v2/layer_15/expansion_output_box/conv_loc/BatchNorm/FusedBatchNorm",
+    "ssd_mobilenet_v2/layer_18/output_box/conv_loc/BatchNorm/FusedBatchNorm",
+    "ssd_mobilenet_v2/last_box/conv_loc/BatchNorm/FusedBatchNorm"
+};
+
+const std::vector<int> img_shape{
+    300, 300
+};
+
+const std::vector<std::vector<int>> feature_shapes{
+    {38, 38},
+    {19, 19},
+    {10, 10},
+    {5, 5}
+};
+
+const std::vector<int> steps{
+    8, 16, 32, 64
+};
+
+const std::vector<std::vector<int>> anchor_sizes{
+    {16, 24},
+    {32, 48},
+    {64, 96},
+    {128, 256}
+};
+
+const std::vector<std::vector<float>> anchor_ratios{
+    {},
+    {},
+    {},
+    {}
+};
+
+const std::vector<float> prior_scaling{
+    0.1, 0.1, 0.2, 0.2
+};
+
+const float nms_threshold = 0.45f;
+
+}
+
+FaceDetection::FaceDetection(const FaceDetectionContext &context) {
+  mace::MaceStatus status;
+  mace::MaceEngineConfig
+      config(static_cast<mace::DeviceType>(context.device_type));
+  status = config.SetCPUThreadPolicy(
+      context.thread_count,
+      static_cast<mace::CPUAffinityPolicy>(context.cpu_affinity_policy));
+  if (status != mace::MaceStatus::MACE_SUCCESS) {
+    std::cerr << "Set openmp or cpu affinity failed." << std::endl;
+  }
+
+#ifdef MACEKIT_ENABLE_OPENCL
+  std::shared_ptr<mace::GPUContext> gpu_context;
+  if (context.device_type == DeviceType::GPU) {
+    // DO NOT USE tmp directory.
+    // Please use APP's own directory and make sure the directory exists.
+    const char *storage_path_ptr = getenv("MACE_INTERNAL_STORAGE_PATH");
+    const std::string storage_path =
+        std::string(storage_path_ptr == nullptr ?
+                    "/data/local/tmp/mace_run/interior" : storage_path_ptr);
+    gpu_context = mace::GPUContextBuilder()
+        .SetStoragePath(storage_path)
+        .Finalize();
+    config.SetGPUContext(gpu_context);
+    config.SetGPUHints(
+        static_cast<mace::GPUPerfHint>(mace::GPUPerfHint::PERF_NORMAL),
+        static_cast<mace::GPUPriorityHint>(mace::GPUPriorityHint::PRIORITY_LOW));
+  }
+#endif  // MACEKIT_ENABLE_OPENCL
+
+  mace::CreateMaceEngineFromCode("ssd_mobilenet_v2",
+                                 nullptr,
+                                 0,
+                                 mace_input_nodes,
+                                 mace_output_nodes,
+                                 config,
+                                 &mace_engine_);
+
+  for (size_t i = 0; i < feature_shapes.size(); i++) {
+    int64_t anchor_count = anchor_sizes[i].size() + anchor_ratios[i].size();
+    std::vector<int64_t> cls_output_shape{
+        1, feature_shapes[i][0], feature_shapes[i][1], anchor_count * 2
+    };
+    int64_t cls_output_size =
+        std::accumulate(cls_output_shape.begin(), cls_output_shape.end(), 1,
+                        std::multiplies<int64_t>());
+    std::vector<int64_t> loc_output_shape{
+        1, feature_shapes[i][0], feature_shapes[i][1], anchor_count * 4
+    };
+    int64_t loc_output_size =
+        std::accumulate(loc_output_shape.begin(), loc_output_shape.end(), 1,
+                        std::multiplies<int64_t>());
+
+    auto buffer_out = std::shared_ptr<float>(new float[cls_output_size],
+                                             std::default_delete<float[]>());
+    mace_output_tensors_[mace_output_nodes[i]] =
+        mace::MaceTensor({cls_output_shape, buffer_out});
+    buffer_out = std::shared_ptr<float>(new float[loc_output_size],
+                                        std::default_delete<float[]>());
+    mace_output_tensors_[mace_output_nodes[i + feature_shapes.size()]] =
+        mace::MaceTensor({loc_output_shape, buffer_out});
+  }
 }
 
 void FaceDetection::Detect(Mat &mat,
@@ -35,49 +155,31 @@ void FaceDetection::Detect(Mat &mat,
   // ...
   // bbox regression:
   // 1, hi, wi, anchor_count_per_pixel x 4 (cy, cx, h, w)
-  const float *localizations_tensor[4];
-  const float *scores_tensor[4];
 
-  std::vector<int> img_shape{
-      300, 300
+  std::vector<int64_t>
+      input_shape{1, mat.shape()[0], mat.shape()[1], mat.shape()[2]};
+  auto input_data = std::shared_ptr<float>(mat.data<float>(), [](float *) {});
+  mace::MaceTensor mace_input_tensor(input_shape, input_data);
+  std::map<std::string, mace::MaceTensor> mace_input_tensors{
+      {mace_input_nodes[0], mace_input_tensor}
   };
 
-  std::vector<std::vector<int>> feature_shapes{
-      {38, 38},
-      {19, 19},
-      {10, 10},
-      {5, 5}
-  };
-
-  std::vector<int> steps{
-      8, 16, 32, 64
-  };
-
-  std::vector<std::vector<int>> anchor_sizes{
-      {16, 24},
-      {32, 48},
-      {64, 96},
-      {128, 256}
-  };
-
-  std::vector<std::vector<float>> anchor_ratios{
-      {},
-      {},
-      {},
-      {}
-  };
-
-  std::vector<float> prior_scaling{
-      0.1, 0.1, 0.2, 0.2
-  };
-
-  float nms_threshold = 0.45f;
+  mace_engine_->Run(mace_input_tensors, &mace_output_tensors_);
 
   int feature_layer_count = feature_shapes.size();
+  std::vector<const float *> localizations_tensor(feature_layer_count);
+  std::vector<const float *> scores_tensor(feature_layer_count);
+
+  for (int i = 0; i < feature_layer_count; i++) {
+    scores_tensor[i] = mace_output_tensors_[mace_output_nodes[i]].data().get();
+    localizations_tensor[i] = mace_output_tensors_[mace_output_nodes[i
+        + feature_layer_count]].data().get();
+  }
+
   int anchor_count = 0;
   for (int i = 0; i < feature_layer_count; i++) {
     anchor_count += feature_shapes[i][0] * feature_shapes[i][1]
-        * (anchor_sizes.size() + anchor_ratios.size());
+        * (anchor_sizes[i].size() + anchor_ratios[i].size());
   }
 
   std::vector<float> scores(anchor_count);

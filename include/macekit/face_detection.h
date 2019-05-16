@@ -16,12 +16,18 @@
 #define MACEKIT_INCLUDE_FACE_DETECTION_H_
 
 #include <vector>
+#include <map>
 #include "macekit/mat.h"
+#include "macekit/common.h"
+#include "third_party/mace/include/mace.h"
 
 namespace mace_kit {
 namespace util {
 
 struct FaceDetectionContext {
+  DeviceType device_type;
+  int thread_count;
+  CPUAffinityPolicy cpu_affinity_policy;
 };
 
 struct Face {
@@ -38,6 +44,10 @@ class FaceDetection {
   FaceDetection(const FaceDetectionContext &context);
 
   void Detect(Mat &mat, int max_face_count, FaceResult *result);
+
+ private:
+  std::shared_ptr<mace::MaceEngine> mace_engine_;
+  std::map<std::string, mace::MaceTensor> mace_output_tensors_;
 };
 
 }  // namespace util

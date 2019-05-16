@@ -1,4 +1,4 @@
-set(MACE_THIRD_PARTY_DIR "${PROJECT_BINARY_DIR}/third_party" CACHE STRING "Third party libraries download & build directories.")
+set(MACEKIT_THIRD_PARTY_DIR "${PROJECT_BINARY_DIR}/third_party" CACHE STRING "Third party libraries download & build directories.")
 
 # Forwarding the cross compile flags
 set(THIRD_PARTY_EXTRA_CMAKE_ARGS
