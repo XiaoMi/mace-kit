@@ -27,12 +27,16 @@ class FaceDetectionTest : public ::testing::Test {
 
     FaceDetection::Create(context, &face_detection_);
   }
+
+  ~FaceDetectionTest() {
+      delete face_detection_;
+  }
+
  protected:
   FaceDetection *face_detection_;
 };
 
-TEST_F(FaceDetectionTest, TestDetect
-) {
+TEST_F(FaceDetectionTest, TestDetect) {
 
 }
 
