@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+#include "macekit/mat.h"
+
 #include <assert.h>
 #include <numeric>
 #include <malloc.h>
 #include <memory>
 #include <cstring>
-#include "macekit/mat.h"
 
 namespace mace_kit {
-namespace util {
 
 template<class T>
 struct DataTypeToEnum;
@@ -120,5 +121,4 @@ int Mat::data_type() const {
   return data_type_;
 }
 
-}  // namespace util
 }  // namespace mace_kit

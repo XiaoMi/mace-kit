@@ -43,4 +43,5 @@ endif(PLATFORM)
 
 include(${PROJECT_SOURCE_DIR}/third_party/gflags/gflags.cmake)
 include(${PROJECT_SOURCE_DIR}/third_party/googletest/googletest.cmake)
+include(${PROJECT_SOURCE_DIR}/third_party/protobuf/protobuf.cmake)
 include(${PROJECT_SOURCE_DIR}/third_party/mace/mace.cmake)

@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_SRC_CORE_MAT_H_
-#define MACEKIT_SRC_CORE_MAT_H_
+#ifndef MACEKIT_INCLUDE_MAT_H_
+#define MACEKIT_INCLUDE_MAT_H_
 
 #include <vector>
 #include <memory>
+#include "macekit/export.h"
 
 namespace mace_kit {
-namespace util {
 
 enum {
   FM_RGB
@@ -30,7 +30,7 @@ enum {
   DT_UINT8
 };
 
-class Mat {
+class MACEKIT_EXPORT Mat {
  public:
   Mat();
 
@@ -74,7 +74,6 @@ class Mat {
   std::shared_ptr<void> created_data_;
 };
 
-}  // namespace util
 }  // namespace mace_kit
 
-#endif  // MACEKIT_SRC_CORE_MAT_H_
+#endif  // MACEKIT_INCLUDE_MAT_H_

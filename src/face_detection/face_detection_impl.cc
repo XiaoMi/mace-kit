@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "macekit/face_detection.h"
+#include "src/face_detection/face_detection_impl.h"
 
 #include <iostream>
 #include <string>
@@ -22,7 +22,6 @@
 #include "mace_engine_factory.h"
 
 namespace mace_kit {
-namespace util {
 
 namespace {
 
@@ -76,9 +75,10 @@ const std::vector<float> prior_scaling{
 
 const float nms_threshold = 0.45f;
 
-}
+}  // namespace
 
-FaceDetection::FaceDetection(const FaceDetectionContext &context) {
+
+FaceDetectionImpl::FaceDetectionImpl(const FaceDetectionContext &context) {
   mace::MaceStatus status;
   mace::MaceEngineConfig
       config(static_cast<mace::DeviceType>(context.device_type));
@@ -142,9 +142,9 @@ FaceDetection::FaceDetection(const FaceDetectionContext &context) {
   }
 }
 
-void FaceDetection::Detect(Mat &mat,
-                           int max_face_count,
-                           FaceResult *result) {
+Status FaceDetectionImpl::Detect(Mat &mat,
+                                 int max_face_count,
+                                 FaceResult *result) {
   // Import MACE model and run.
   //
   // MACE model has n (feature_layers) x 2 (classification/bbox regression)
@@ -185,7 +185,7 @@ void FaceDetection::Detect(Mat &mat,
   std::vector<float> scores(anchor_count);
   std::vector<float> localizations(anchor_count * 4);
   int anchor_index = 0;
-  SSDBbox ssd_bbox;
+  util::SSDBbox ssd_bbox;
 
   for (int i = 0; i < feature_layer_count; i++) {
     std::vector<std::vector<float>> anchor_shapes;
@@ -230,7 +230,14 @@ void FaceDetection::Detect(Mat &mat,
     faces[i].score = output_scores[i];
     faces[i].localization = output_localizations[i];
   }
+
+  return Status::OK();
 }
 
-}  // namespace util
+Status FaceDetection::Create(const FaceDetectionContext &context,
+                             FaceDetection **face_detection_ptr) {
+  *face_detection_ptr = new FaceDetectionImpl(context);
+  return Status::OK();
+}
+
 }  // namespace mace_kit

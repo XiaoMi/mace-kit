@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_INCLUDE_COMMON_H_
-#define MACEKIT_INCLUDE_COMMON_H_
+#ifndef MACEKIT_INCLUDE_TYPE_H_
+#define MACEKIT_INCLUDE_TYPE_H_
 
 enum DeviceType { CPU = 0, GPU = 2, HEXAGON = 3, HTA = 4 };
 
@@ -25,4 +25,4 @@ enum CPUAffinityPolicy {
   AFFINITY_POWER_SAVE = 4,
 };
 
-#endif  // MACEKIT_INCLUDE_COMMON_H_
+#endif  // MACEKIT_INCLUDE_TYPE_H_

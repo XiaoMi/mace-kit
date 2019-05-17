@@ -18,39 +18,40 @@
 #include <vector>
 #include <map>
 #include "macekit/mat.h"
-#include "macekit/common.h"
-#include "third_party/mace/include/mace.h"
+#include "macekit/type.h"
+#include "macekit/export.h"
+#include "macekit/status.h"
 
 namespace mace_kit {
-namespace util {
 
-struct FaceDetectionContext {
+struct MACEKIT_EXPORT FaceDetectionContext {
   DeviceType device_type;
   int thread_count;
   CPUAffinityPolicy cpu_affinity_policy;
 };
 
-struct Face {
+struct MACEKIT_EXPORT Face {
   float score;
   std::vector<float> localization;
 };
 
-struct FaceResult {
+struct MACEKIT_EXPORT FaceResult {
   std::vector<Face> faces;
 };
 
-class FaceDetection {
+class MACEKIT_EXPORT FaceDetection {
  public:
-  FaceDetection(const FaceDetectionContext &context);
+  static Status Create(const FaceDetectionContext &context, FaceDetection **face_detection_ptr);
 
-  void Detect(Mat &mat, int max_face_count, FaceResult *result);
+  FaceDetection() = default;
+  FaceDetection(const FaceDetection&) = delete;
+  FaceDetection& operator=(const FaceDetection&) = delete;
 
- private:
-  std::shared_ptr<mace::MaceEngine> mace_engine_;
-  std::map<std::string, mace::MaceTensor> mace_output_tensors_;
+  virtual ~FaceDetection() = default;
+
+  virtual Status Detect(Mat &mat, int max_face_count, FaceResult *result) = 0;
 };
 
-}  // namespace util
 }  // namespace mace_kit
 
 #endif  // MACEKIT_INCLUDE_FACE_DETECTION_H_
