@@ -17,6 +17,7 @@
 
 #include "macekit/face_detection.h"
 #include "mace/public/mace.h"
+#include "src/util/ssd_bbox.h"
 
 namespace mace_kit {
 
@@ -34,6 +35,7 @@ class FaceDetectionImpl : public FaceDetection {
  private:
   std::shared_ptr<mace::MaceEngine> mace_engine_;
   std::map<std::string, mace::MaceTensor> mace_output_tensors_;
+  util::SSDBbox ssd_bbox;
 };
 
 }  // namespace mace_kit

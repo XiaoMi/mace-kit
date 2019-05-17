@@ -13,10 +13,34 @@
 // limitations under the License.
 
 #include "gtest/gtest.h"
+#include "opencv2/opencv.hpp"
 #include "macekit/face_detection.h"
 
 namespace mace_kit {
 
+namespace {
+
+void DrawAnchor(cv::InputOutputArray img,
+                const FaceResult &face_result) {
+  auto &faces = face_result.faces;
+
+  for (auto &face : faces) {
+    cv::Rect rect
+        (face.localization[0],
+         face.localization[1],
+         face.localization[2] - face.localization[0],
+         face.localization[3] - face.localization[1]);
+    cv::rectangle(img, rect, cv::Scalar(250, 0, 0));
+    cv::putText(img,
+                std::to_string(face.score),
+                rect.tl(),
+                cv::FONT_ITALIC,
+                0.5,
+                cv::Scalar(100, 0, 0));
+  }
+}
+
+}  // namespace
 class FaceDetectionTest : public ::testing::Test {
  public:
   FaceDetectionTest() {
@@ -37,7 +61,15 @@ class FaceDetectionTest : public ::testing::Test {
 };
 
 TEST_F(FaceDetectionTest, TestDetect) {
+  ::testing::internal::LogToStderr();
+  cv::Mat img = cv::imread("data/test/000001.jpg");
+  Mat input({300, 300, 3}, DT_FLOAT32, FM_RGB, img.data);
+  FaceResult result;
+  Status status = face_detection_->Detect(input, 500, &result);
+  EXPECT_TRUE(status.ok());
 
+  DrawAnchor(img, result);
+  cv::imwrite("test_out.png", img);
 }
 
 }  // mace_kit

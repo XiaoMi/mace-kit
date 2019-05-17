@@ -18,7 +18,6 @@
 #include <string>
 #include <vector>
 #include <numeric>
-#include "src/util/ssd_bbox.h"
 #include "mace_engine_factory.h"
 
 namespace mace_kit {
@@ -79,6 +78,17 @@ const float nms_threshold = 0.45f;
 
 
 FaceDetectionImpl::FaceDetectionImpl(const FaceDetectionContext &context) {
+  // Import MACE model.
+  //
+  // MACE model has n (feature_layers) x 2 (classification/bbox regression)
+  // for MACE Kit model, we use n = 4.
+  // output tensors:
+  // classification outputs:
+  // 1, hi, wi, anchor_count_per_pixel x 2 (background / face)
+  // ...
+  // bbox regression:
+  // 1, hi, wi, anchor_count_per_pixel x 4 (cy, cx, h, w)
+
   mace::MaceStatus status;
   mace::MaceEngineConfig
       config(static_cast<mace::DeviceType>(context.device_type));
@@ -145,17 +155,6 @@ FaceDetectionImpl::FaceDetectionImpl(const FaceDetectionContext &context) {
 Status FaceDetectionImpl::Detect(Mat &mat,
                                  int max_face_count,
                                  FaceResult *result) {
-  // Import MACE model and run.
-  //
-  // MACE model has n (feature_layers) x 2 (classification/bbox regression)
-  // for MACE Kit model, we use n = 4.
-  // output tensors:
-  // classification outputs:
-  // 1, hi, wi, anchor_count_per_pixel x 2 (background / face)
-  // ...
-  // bbox regression:
-  // 1, hi, wi, anchor_count_per_pixel x 4 (cy, cx, h, w)
-
   std::vector<int64_t>
       input_shape{1, mat.shape()[0], mat.shape()[1], mat.shape()[2]};
   auto input_data = std::shared_ptr<float>(mat.data<float>(), [](float *) {});
@@ -185,12 +184,11 @@ Status FaceDetectionImpl::Detect(Mat &mat,
   std::vector<float> scores(anchor_count);
   std::vector<float> localizations(anchor_count * 4);
   int anchor_index = 0;
-  util::SSDBbox ssd_bbox;
 
   for (int i = 0; i < feature_layer_count; i++) {
     std::vector<std::vector<float>> anchor_shapes;
     ssd_bbox.GetAnchorsShape(img_shape[0],
-                             img_shape[2],
+                             img_shape[1],
                              anchor_sizes[i][0],
                              anchor_sizes[i][1],
                              anchor_ratios[i],
@@ -228,16 +226,19 @@ Status FaceDetectionImpl::Detect(Mat &mat,
   auto &faces = result->faces;
   for (size_t i = 0; i < output_scores.size(); i++) {
     faces[i].score = output_scores[i];
-    faces[i].localization = output_localizations[i];
+    faces[i].localization = {output_localizations[i][0] * img_shape[0],
+                             output_localizations[i][1] * img_shape[1],
+                             output_localizations[i][2] * img_shape[0],
+                             output_localizations[i][3] * img_shape[1]};
+    }
+
+    return Status::OK();
   }
 
-  return Status::OK();
-}
-
-Status FaceDetection::Create(const FaceDetectionContext &context,
-                             FaceDetection **face_detection_ptr) {
-  *face_detection_ptr = new FaceDetectionImpl(context);
-  return Status::OK();
-}
+  Status FaceDetection::Create(const FaceDetectionContext &context,
+                               FaceDetection **face_detection_ptr) {
+    *face_detection_ptr = new FaceDetectionImpl(context);
+    return Status::OK();
+  }
 
 }  // namespace mace_kit

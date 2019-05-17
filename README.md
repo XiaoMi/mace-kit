@@ -4,7 +4,7 @@ MACE-Kit: a Machine Learning Toolkit Powered by MACE
 Feature List
 -------------
 
-[ ] Face Detection
+- [ ] Face Detection
  
 How to build
 -------------
