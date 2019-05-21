@@ -16,6 +16,7 @@
 #include <cmath>
 #include <algorithm>
 #include <functional>
+#include <iostream>
 #include "src/util/ssd_bbox.h"
 
 namespace mace_kit {
@@ -53,15 +54,15 @@ void SSDBbox::Decode(const float *feature_localizations,
         float dcy = (h + offset) * step_scale / img_shape[0];
         float dcx = (w + offset) * step_scale / img_shape[1];
 
-        float gcy = dcy + feature_data[0] * dh * prior_scaling[0];  // cy
-        float gcx = dcx + feature_data[1] * dw * prior_scaling[1];  // cx
-        float gh = exp(feature_data[2] * dh * prior_scaling[2]);   // h
-        float gw = exp(feature_data[3] * dw * prior_scaling[3]);   // w
+        float gcx = dcx + feature_data[0] * dw * prior_scaling[0];  // cx
+        float gcy = dcy + feature_data[1] * dh * prior_scaling[1];  // cy
+        float gw = dw * exp(feature_data[2] * prior_scaling[2]);   // w
+        float gh = dh * exp(feature_data[3] * prior_scaling[3]);   // h
 
-        output_data[0] = std::max(0.f, gcy - gh / 2);
-        output_data[1] = std::max(0.f, gcx - gw / 2);
-        output_data[2] = std::min(1.f, gcy + gh / 2);
-        output_data[3] = std::min(1.f, gcx + gw / 2);
+        output_data[0] = std::max(0.f, gcx - gw / 2);
+        output_data[1] = std::max(0.f, gcy - gh / 2);
+        output_data[2] = std::min(1.f, gcx + gw / 2);
+        output_data[3] = std::min(1.f, gcy + gh / 2);
 
         feature_data += 4;
         output_data += 4;
@@ -101,10 +102,13 @@ void SSDBbox::SelectTopAndNMS(
     std::vector<float> *output_scores,
     std::vector<std::vector<float>> *output_localization,
     int top_k,
+    float score_threshold,
     float nms_threshold) {
-  std::vector<std::pair<float, int>> scores_with_indices(anchor_count);
+  std::vector<std::pair<float, int>> scores_with_indices;
   for (int i = 0; i < anchor_count; i++) {
-    scores_with_indices[i] = {scores[i], i};
+    if (scores[i] > score_threshold) {
+      scores_with_indices.emplace_back(scores[i], i);
+    }
   }
   std::sort(scores_with_indices.begin(),
             scores_with_indices.end(),
@@ -113,17 +117,17 @@ void SSDBbox::SelectTopAndNMS(
               return lhs.first > rhs.first
                   || (lhs.first == rhs.first && lhs.second < rhs.second);
             });
-  top_k = std::min(top_k, anchor_count);
+  top_k = std::min(top_k, static_cast<int>(scores_with_indices.size()));
   std::vector<int> indices(top_k);
   for (int i = 0; i < top_k; i++) {
     indices[i] = scores_with_indices[i].second;
   }
 
   output_scores->push_back(scores[indices[0]]);
-  output_localization->push_back({localization[indices[0]],
-                                  localization[indices[0] + 1],
-                                  localization[indices[0] + 2],
-                                  localization[indices[0] + 3]});
+  output_localization->push_back({localization[indices[0] * 4],
+                                  localization[indices[0] * 4 + 1],
+                                  localization[indices[0] * 4 + 2],
+                                  localization[indices[0] * 4 + 3]});
 
   for (int i = 1; i < top_k; i++) {
     bool retain = true;
@@ -131,7 +135,7 @@ void SSDBbox::SelectTopAndNMS(
     for (int j = 0; j < i; j++) {
       float iou = CalJaccard(localization + indices[i] * 4,
                              localization + indices[j] * 4);
-      if (iou > 0.45) {
+      if (iou > nms_threshold) {
         retain = false;
         break;
       }

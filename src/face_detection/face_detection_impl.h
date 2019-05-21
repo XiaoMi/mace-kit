@@ -34,6 +34,7 @@ class FaceDetectionImpl : public FaceDetection {
 
  private:
   std::shared_ptr<mace::MaceEngine> mace_engine_;
+  std::shared_ptr<float> mace_input_buffer_;
   std::map<std::string, mace::MaceTensor> mace_output_tensors_;
   util::SSDBbox ssd_bbox;
 };

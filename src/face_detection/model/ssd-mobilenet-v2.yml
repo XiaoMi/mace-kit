@@ -6,7 +6,7 @@ models:
   ssd_mobilenet_v2:
     platform: tensorflow
     model_file_path: ../mace-kit/model/face_detection/ssd-mobilenet-v2.pb
-    model_sha256_checksum: d7820f584dfc1659b7b62e432a2bee9c22ca37dbde9c1c5a6a7efc93d443602e
+    model_sha256_checksum: 5f502c7e07634e1eaa8bb92f757ec03b06d4e3e98ce8d747cb9b52850e18476b
     subgraphs:
       - input_tensors:
           - input

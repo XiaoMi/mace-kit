@@ -32,7 +32,7 @@ class SSDBbox {
   // according to different encoding implementation.
   //
   // `feature_localization`: regressed output localization. Its size
-  // should be `feature_size` x anchor_count x 4 (cy, cx, h, w).
+  // should be `feature_size` x anchor_count x 4 (cx, cy, w, h).
   // `feature_size` equals to number of pixels for this feature layer.
   //
   // `feature_shape`: height and width of this feature layer.
@@ -52,8 +52,8 @@ class SSDBbox {
   // Encoding formula:
   // g^(cx) = [g(cx) - d(cx)] / d(w) / prior_scaling(cx)
   // g^(cy) = [g(cy) - d(cy)] / d(h) / prior_scaling(cy)
-  // g^(w) = log[g(w) / d(w) / prior_scaling(w)]
-  // g^(h) = log[g(h) / d(h) / prior_scaling(h)]
+  // g^(w) = log[g(w) / d(w)] / prior_scaling(w)
+  // g^(h) = log[g(h) / d(h)] / prior_scaling(h)
   //
   // where g^ is encoded localization, g is actual localization,
   // d is anchor localization.
@@ -61,8 +61,8 @@ class SSDBbox {
   // This implies decoding formula:
   // g(cx) = d(cx) + g^(cx) * d(w) * prior_scaling(cx)
   // g(cy) = d(cy) + g^(cy) * d(h) * prior_scaling(cy)
-  // g(w) = exp[g^(w) * d(w) * prior_scaling(w)]
-  // g(h) = exp[g^(h) * d(h) * prior_scaling(h)]
+  // g(w) = exp[g^(w) * d(w)] * prior_scaling(w)
+  // g(h) = exp[g^(h) * d(h)] * prior_scaling(h)
   //
   // So final decoded bbox location should be:
   // [g(cy) - g(h) / 2, g(cx) - g(w) / 2, g(cy) + g(h) / 2, g(cx) + g(w) / 2]
@@ -93,7 +93,8 @@ class SSDBbox {
                        std::vector<float> *output_scores,
                        std::vector<std::vector<float>> *output_localizations,
                        int top_k = -1,
-                       float nms_threshold = 0.45);
+                       float score_threshold = 0.5f,
+                       float nms_threshold = 0.45f);
 
   float CalJaccard(const float *lhs,
                    const float *rhs);

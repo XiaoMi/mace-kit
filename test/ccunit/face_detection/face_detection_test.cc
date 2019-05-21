@@ -24,12 +24,13 @@ void DrawAnchor(cv::InputOutputArray img,
                 const FaceResult &face_result) {
   auto &faces = face_result.faces;
 
+  int height = img.rows(), width = img.cols();
   for (auto &face : faces) {
-    cv::Rect rect
-        (face.localization[0],
-         face.localization[1],
-         face.localization[2] - face.localization[0],
-         face.localization[3] - face.localization[1]);
+    cv::Rect rect(
+        width * face.localization[0],
+        height * face.localization[1],
+        width * (face.localization[2] - face.localization[0]),
+        height * (face.localization[3] - face.localization[1]));
     cv::rectangle(img, rect, cv::Scalar(250, 0, 0));
     cv::putText(img,
                 std::to_string(face.score),
@@ -53,7 +54,7 @@ class FaceDetectionTest : public ::testing::Test {
   }
 
   ~FaceDetectionTest() {
-      delete face_detection_;
+    delete face_detection_;
   }
 
  protected:
@@ -63,7 +64,18 @@ class FaceDetectionTest : public ::testing::Test {
 TEST_F(FaceDetectionTest, TestDetect) {
   ::testing::internal::LogToStderr();
   cv::Mat img = cv::imread("data/test/000001.jpg");
-  Mat input({300, 300, 3}, DT_FLOAT32, FM_RGB, img.data);
+
+  cv::Mat img_rgb;
+  cv::cvtColor(img, img_rgb, cv::COLOR_BGR2RGB);
+
+  cv::Mat img_fp32;
+  img_rgb.
+  convertTo(img_fp32, CV_32FC3);
+
+  cv::Mat img300_resized;
+  cv::resize(img_fp32, img300_resized, cv::Size(300, 300));
+
+  Mat input({300, 300, 3}, DT_FLOAT32, FM_RGB, img300_resized.data);
   FaceResult result;
   Status status = face_detection_->Detect(input, 500, &result);
   EXPECT_TRUE(status.ok());
