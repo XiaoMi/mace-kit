@@ -1,6 +1,10 @@
+# FIXME: Mace conflicts with `mace::CreateEngineFromCode`
+# if linking two libmodels.
+
 file(GLOB MACEKIT_CC_TEST_SRCS
         util/*.cc
         face_detection/*.cc
+        face_recognition/*.cc
         )
 
 if (ANDROID_ABI)
@@ -20,6 +24,7 @@ target_link_libraries(macekit_cc_unitest PRIVATE
         core
         util
         face_detection
+        face_recognition
         gtest
         gtest_main
         ${log-lib}

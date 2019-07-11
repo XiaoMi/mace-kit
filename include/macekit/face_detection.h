@@ -21,13 +21,11 @@
 #include "macekit/type.h"
 #include "macekit/export.h"
 #include "macekit/status.h"
+#include "macekit/context.h"
 
 namespace mace_kit {
 
-struct MACEKIT_EXPORT FaceDetectionContext {
-  DeviceType device_type;
-  int thread_count;
-  CPUAffinityPolicy cpu_affinity_policy;
+struct MACEKIT_EXPORT FaceDetectionContext : Context {
 };
 
 struct MACEKIT_EXPORT Face {
@@ -41,11 +39,12 @@ struct MACEKIT_EXPORT FaceResult {
 
 class MACEKIT_EXPORT FaceDetection {
  public:
-  static Status Create(const FaceDetectionContext &context, FaceDetection **face_detection_ptr);
+  static Status Create(const FaceDetectionContext &context,
+                       FaceDetection **face_detection_ptr);
 
   FaceDetection() = default;
-  FaceDetection(const FaceDetection&) = delete;
-  FaceDetection& operator=(const FaceDetection&) = delete;
+  FaceDetection(const FaceDetection &) = delete;
+  FaceDetection &operator=(const FaceDetection &) = delete;
 
   virtual ~FaceDetection() = default;
 

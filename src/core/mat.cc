@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #include "macekit/mat.h"
 
 #include <assert.h>
@@ -83,13 +82,25 @@ void *Mat::ptr() {
   return data_;
 }
 
+
 void Mat::Create(const std::vector<int> &shape, int data_type) {
+  shape_ = shape;
+  data_type_ = data_type;
   int size =
       std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int>());
   if (size > 0) {
-    u_char *data = (u_char *) memalign(kMemoryAlignment, size);
+    u_char  *data = nullptr;
+    if (DataTypeToEnum<float>::value == data_type) {
+      data = (u_char *) memalign(kMemoryAlignment, size * sizeof(float));
+    } else if (DataTypeToEnum<uint8_t>::value == data_type) {
+      data = (u_char *) memalign(kMemoryAlignment, size);
+    } else {
+      assert(false);
+    }
+
     assert(data != nullptr);
     created_data_.reset(data);
+    data_ = created_data_.get();
   }
 }
 

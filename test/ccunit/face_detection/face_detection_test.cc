@@ -63,7 +63,7 @@ class FaceDetectionTest : public ::testing::Test {
 
 TEST_F(FaceDetectionTest, TestDetect) {
   ::testing::internal::LogToStderr();
-  cv::Mat img = cv::imread("data/test/000001.jpg");
+  cv::Mat img = cv::imread("data/test/000003.jpg");
 
   cv::Mat img_rgb;
   cv::cvtColor(img, img_rgb, cv::COLOR_BGR2RGB);
