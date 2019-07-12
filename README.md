@@ -5,6 +5,7 @@ Feature List
 -------------
 
 - [ ] Face Detection
+- [ ] Face Recognition
  
 How to build
 -------------
