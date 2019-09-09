@@ -1,0 +1,18 @@
+models:
+  face_recognition:
+    platform: tensorflow
+    model_file_path: ../mace-kit/src_model/face_recognition.pb
+    model_sha256_checksum: 5b58c6642385c56a722ac95bc364cd8715c5710290ddd70186db5bd70a90ac27
+    subgraphs:
+      - input_tensors:
+          - input
+        input_shapes:
+          - 1,112,112,3
+        output_tensors:
+          - face_recognition/MobileFaceNet/Logits/SpatialSqueeze
+        output_shapes:
+          - 1,128
+    runtime: gpu
+    limit_opencl_kernel_time: 0
+    obfuscate: 0
+    winograd: 2

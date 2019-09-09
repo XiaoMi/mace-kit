@@ -19,7 +19,7 @@
 #include <vector>
 #include <numeric>
 #include <cmath>
-#include "src/face_recognition/model/include/mace/public/mace_engine_factory.h"
+#include "src/face_recognition/model/include/mace_engine_factory.h"
 
 namespace mace_kit {
 
@@ -101,6 +101,7 @@ Status FaceRecognitionImpl::ComputeEmbedding(Mat &mat,
       for (int c = 0; c < 3; c++) {
         mace_input_buffer_.get()[idx] =
             mat.data<float>()[idx] / 127.5f - 1.f;
+
         idx++;
       }
     }

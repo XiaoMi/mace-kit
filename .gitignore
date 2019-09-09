@@ -2,8 +2,5 @@ cmake-build-debug/
 cmake-build/
 build/
 .idea/
-third_party/mace/include/
-third_party/mace/lib/
 ckpt/
-*.pb
 

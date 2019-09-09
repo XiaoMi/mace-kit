@@ -3,7 +3,7 @@
 
 file(GLOB MACEKIT_CC_TEST_SRCS
         util/*.cc
-        face_detection/*.cc
+#        face_detection/*.cc
         face_recognition/*.cc
         )
 
@@ -21,10 +21,11 @@ message("OpenCV_LIBS: ${OpenCV_LIBS}")
 
 add_executable(macekit_cc_unitest ${MACEKIT_CC_TEST_SRCS})
 target_link_libraries(macekit_cc_unitest PRIVATE
+#        face_detection
+        face_recognition
+        mace
         core
         util
-        face_detection
-        face_recognition
         gtest
         gtest_main
         ${log-lib}

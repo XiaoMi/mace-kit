@@ -7,9 +7,9 @@ set(MACE_LIB_DIR "${MACE_SRCS_DIR}/src/extern_mace/lib" CACHE PATH "mace lib dir
 include_directories(SYSTEM ${MACE_INCLUDE_DIR})
 
 if (ANDROID_ABI)
-    set(MACE_LIBRARIES "${MACE_LIB_DIR}/${ANDROID_ABI}/cpu_gpu/libmace.a" CACHE FILEPATH "MACE_LIBRARIES" FORCE)
+    set(MACE_LIBRARIES "${MACE_LIB_DIR}/${ANDROID_ABI}/cpu_gpu/libmace.so" CACHE FILEPATH "MACE_LIBRARIES" FORCE)
 else (ANDROID_ABI)
-    set(MACE_LIBRARIES "${MACE_LIB_DIR}/linux-x86-64/libmace.a" CACHE FILEPATH "MACE_LIBRARIES" FORCE)
+    set(MACE_LIBRARIES "${MACE_LIB_DIR}/linux-x86-64/libmace.so" CACHE FILEPATH "MACE_LIBRARIES" FORCE)
 endif (ANDROID_ABI)
 
 set(MACE_URL     "http://cnbj1.fds.api.xiaomi.com/mace/release/libmace-0.11.0-rc0.zip")
@@ -27,7 +27,7 @@ ExternalProject_Add(
         TEST_COMMAND      ""
 )
 
-add_library(mace STATIC IMPORTED GLOBAL)
+add_library(mace SHARED IMPORTED GLOBAL)
 set_property(TARGET mace PROPERTY IMPORTED_LOCATION ${MACE_LIBRARIES})
 add_dependencies(mace extern_mace)
 
