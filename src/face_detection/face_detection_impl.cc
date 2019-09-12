@@ -19,7 +19,8 @@
 #include <vector>
 #include <numeric>
 #include <cmath>
-#include "mace_engine_factory.h"
+
+#include "src/face_detection/model/include/mace_engine_factory.h"
 
 namespace mace_kit {
 
@@ -36,23 +37,23 @@ const std::vector<std::string> mace_input_nodes{
 };
 
 const std::vector<std::string> mace_output_nodes{
-    "ssd_mobilenet_v2/layer_8/expansion_output_box/conv_cls/BatchNorm/FusedBatchNorm",
-    "ssd_mobilenet_v2/layer_15/expansion_output_box/conv_cls/BatchNorm/FusedBatchNorm",
-    "ssd_mobilenet_v2/layer_18/output_box/conv_cls/BatchNorm/FusedBatchNorm",
-    "ssd_mobilenet_v2/last_box/conv_cls/BatchNorm/FusedBatchNorm",
-    "ssd_mobilenet_v2/layer_8/expansion_output_box/conv_loc/BatchNorm/FusedBatchNorm",
-    "ssd_mobilenet_v2/layer_15/expansion_output_box/conv_loc/BatchNorm/FusedBatchNorm",
-    "ssd_mobilenet_v2/layer_18/output_box/conv_loc/BatchNorm/FusedBatchNorm",
-    "ssd_mobilenet_v2/last_box/conv_loc/BatchNorm/FusedBatchNorm"
+    "feat1_box/conv_cls/BatchNorm/FusedBatchNorm",
+    "feat2_box/conv_cls/BatchNorm/FusedBatchNorm",
+    "feat3_box/conv_cls/BatchNorm/FusedBatchNorm",
+    "feat4_box/conv_cls/BatchNorm/FusedBatchNorm",
+    "feat1_box/conv_loc/BatchNorm/FusedBatchNorm",
+    "feat2_box/conv_loc/BatchNorm/FusedBatchNorm",
+    "feat3_box/conv_loc/BatchNorm/FusedBatchNorm",
+    "feat4_box/conv_loc/BatchNorm/FusedBatchNorm",
 };
 
 const std::vector<int> img_shape{
-    300, 300
+    320, 320
 };
 
 const std::vector<std::vector<int>> feature_shapes{
-    {38, 38},
-    {19, 19},
+    {40, 40},
+    {20, 20},
     {10, 10},
     {5, 5}
 };

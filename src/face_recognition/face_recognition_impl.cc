@@ -14,7 +14,7 @@
 
 #include "src/face_recognition/face_recognition_impl.h"
 
-#include <iostream>
+//#include <iostream>
 #include <string>
 #include <vector>
 #include <numeric>
@@ -50,7 +50,7 @@ FaceRecognitionImpl::FaceRecognitionImpl(const FaceRecognitionContext &context) 
       context.thread_count,
       static_cast<mace::CPUAffinityPolicy>(context.cpu_affinity_policy));
   if (status != mace::MaceStatus::MACE_SUCCESS) {
-    std::cerr << "Set openmp or cpu affinity failed." << std::endl;
+//    std::cerr << "Set openmp or cpu affinity failed." << std::endl;
   }
 
 #ifdef MACEKIT_ENABLE_OPENCL
