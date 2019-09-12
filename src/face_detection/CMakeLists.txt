@@ -11,4 +11,4 @@ if(NOT APPLE)
 endif(NOT APPLE)
 
 
-install(TARGETS face_detection ARCHIVE DESTINATION lib)
+install(TARGETS face_detection DESTINATION lib)

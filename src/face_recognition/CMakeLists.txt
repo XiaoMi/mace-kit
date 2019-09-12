@@ -10,4 +10,4 @@ if(NOT APPLE)
             "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/version_script.lds")
 endif(NOT APPLE)
 
-install(TARGETS face_recognition ARCHIVE DESTINATION lib)
+install(TARGETS face_recognition DESTINATION lib)
