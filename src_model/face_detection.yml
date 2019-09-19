@@ -2,7 +2,7 @@ models:
   face_detection:
     platform: tensorflow
     model_file_path: ../mace-kit/src_model/face_detection.pb
-    model_sha256_checksum: 5b4a9d4def48c8f080a018ed31cdc9ec853163b7924f4634de52091aa6385f03
+    model_sha256_checksum: 28308e90e10d6cb50ec04e2127b24cbd8a26680307472ef98fffa5496cfd6bef
     subgraphs:
       - input_tensors:
           - input

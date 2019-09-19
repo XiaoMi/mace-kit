@@ -116,7 +116,7 @@ FaceDetectionImpl::FaceDetectionImpl(const FaceDetectionContext &context) {
     const char *storage_path_ptr = getenv("MACE_INTERNAL_STORAGE_PATH");
     const std::string storage_path =
         std::string(storage_path_ptr == nullptr ?
-                    "/data/local/tmp/mace_run/interior" : storage_path_ptr);
+                    "/data/local/tmp" : storage_path_ptr);
     gpu_context = mace::GPUContextBuilder()
         .SetStoragePath(storage_path)
         .Finalize();
@@ -127,7 +127,7 @@ FaceDetectionImpl::FaceDetectionImpl(const FaceDetectionContext &context) {
   }
 #endif  // MACEKIT_ENABLE_OPENCL
 
-  mace::CreateMaceEngineFromCode("ssd_mobilenet_v2",
+  mace::CreateMaceEngineFromCode("face_detection",
                                  nullptr,
                                  0,
                                  mace_input_nodes,

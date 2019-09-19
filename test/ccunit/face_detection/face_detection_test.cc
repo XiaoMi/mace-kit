@@ -41,12 +41,27 @@ void DrawAnchor(cv::InputOutputArray img,
   }
 }
 
+void ImgToMat(const cv::Mat &img, Mat *mat) {
+  cv::Mat img_rgb;
+  cv::cvtColor(img, img_rgb, cv::COLOR_BGR2RGB);
+
+  cv::Mat img_fp32;
+  img_rgb.convertTo(img_fp32, CV_32FC3);
+
+  cv::Mat img_resized;
+  const size_t img_size = 320;
+  cv::resize(img_fp32, img_resized, cv::Size(img_size, img_size));
+
+  mat->Create({img_size, img_size, 3}, DT_FLOAT32);
+  memcpy(mat->ptr(), img_resized.data, img_size * img_size * 3 * sizeof(float));
+}
+
 }  // namespace
 class FaceDetectionTest : public ::testing::Test {
  public:
   FaceDetectionTest() {
     FaceDetectionContext context;
-    context.device_type = DeviceType::CPU;
+    context.device_type = DeviceType::GPU;
     context.cpu_affinity_policy = CPUAffinityPolicy::AFFINITY_NONE;
     context.thread_count = 4;
 
@@ -64,20 +79,11 @@ class FaceDetectionTest : public ::testing::Test {
 TEST_F(FaceDetectionTest, TestDetect) {
   ::testing::internal::LogToStderr();
   cv::Mat img = cv::imread("data/test/000003.jpg");
+  Mat input;
+  ImgToMat(img, &input);
 
-  cv::Mat img_rgb;
-  cv::cvtColor(img, img_rgb, cv::COLOR_BGR2RGB);
-
-  cv::Mat img_fp32;
-  img_rgb.
-  convertTo(img_fp32, CV_32FC3);
-
-  cv::Mat img300_resized;
-  cv::resize(img_fp32, img300_resized, cv::Size(300, 300));
-
-  Mat input({300, 300, 3}, DT_FLOAT32, FM_RGB, img300_resized.data);
   FaceResult result;
-  Status status = face_detection_->Detect(input, 500, &result);
+  Status status = face_detection_->Detect(input, 50, &result);
   EXPECT_TRUE(status.ok());
 
   DrawAnchor(img, result);

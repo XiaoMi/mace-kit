@@ -70,13 +70,16 @@ __attribute__((deprecated)) MaceStatus CreateMaceEngineFromCode(
     return MaceStatus::MACE_INVALID_ARGS;
   }
   std::shared_ptr<NetDef> net_def;
+  (void)model_data_file;
+  const unsigned char * model_data;
   MaceStatus status = MaceStatus::MACE_SUCCESS;
   switch (model_name_map[model_name]) {
     case 0:
       net_def = mace::face_detection::CreateNet();
       engine->reset(new mace::MaceEngine(config));
+      model_data = mace::face_detection::LoadModelData();
       status = (*engine)->Init(net_def.get(), input_nodes, output_nodes,
-                               model_data_file);
+                               model_data);
       break;
    default:
      status = MaceStatus::MACE_INVALID_ARGS;
@@ -98,6 +101,8 @@ MACE_API MaceStatus CreateMaceEngineFromCode(
     return MaceStatus::MACE_INVALID_ARGS;
   }
   std::shared_ptr<NetDef> net_def;
+  const unsigned char * model_data;
+  (void)model_weights_data;
   // TODO(yejianwu) Add buffer range checking
   (void)model_weights_data_size;
 
@@ -106,8 +111,9 @@ MACE_API MaceStatus CreateMaceEngineFromCode(
     case 0:
       net_def = mace::face_detection::CreateNet();
       engine->reset(new mace::MaceEngine(config));
+      model_data = mace::face_detection::LoadModelData();
       status = (*engine)->Init(net_def.get(), input_nodes, output_nodes,
-                               model_weights_data);
+                               model_data);
       break;
    default:
      status = MaceStatus::MACE_INVALID_ARGS;

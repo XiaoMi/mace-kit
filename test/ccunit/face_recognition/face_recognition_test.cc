@@ -24,7 +24,7 @@ class FaceRecognitionTest : public ::testing::Test {
  public:
   FaceRecognitionTest() {
     FaceRecognitionContext context;
-    context.device_type = DeviceType::CPU;
+    context.device_type = DeviceType::GPU;
     context.cpu_affinity_policy = CPUAffinityPolicy::AFFINITY_NONE;
     context.thread_count = 4;
 

@@ -9,6 +9,7 @@ HunterGate(
 
 project(MaceKit C CXX)
 
+option(MACEKIT_ENABLE_OPENCL    "whether to enable OpenCL support" OFF)
 option(MACEKIT_ENABLE_TESTS     "whether to build unit tests" ON)
 option(MACEKIT_ENABLE_BENCHMARK "whether to build micro benchmarks" OFF)
 
@@ -40,6 +41,13 @@ if(NOT MSVC)
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${MACEKIT_LINKER_FLAGS}")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MACEKIT_LINKER_FLAGS}")
 endif(NOT MSVC)
+
+if(MACEKIT_ENABLE_OPENCL)
+  if(IOS)
+    message(FATAL_ERROR "OpenCL is not supported for iOS")
+  endif(IOS)
+  add_definitions(-DMACEKIT_ENABLE_OPENCL)
+endif(MACEKIT_ENABLE_OPENCL)
 
 include(${PROJECT_SOURCE_DIR}/third_party/third_party.cmake)
 include_directories("${PROJECT_SOURCE_DIR}")

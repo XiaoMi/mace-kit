@@ -14,7 +14,7 @@
 
 #include "src/face_recognition/face_recognition_impl.h"
 
-//#include <iostream>
+#include <iostream>
 #include <string>
 #include <vector>
 #include <numeric>
@@ -50,7 +50,7 @@ FaceRecognitionImpl::FaceRecognitionImpl(const FaceRecognitionContext &context) 
       context.thread_count,
       static_cast<mace::CPUAffinityPolicy>(context.cpu_affinity_policy));
   if (status != mace::MaceStatus::MACE_SUCCESS) {
-//    std::cerr << "Set openmp or cpu affinity failed." << std::endl;
+    std::cerr << "Set openmp or cpu affinity failed." << std::endl;
   }
 
 #ifdef MACEKIT_ENABLE_OPENCL
@@ -61,7 +61,7 @@ FaceRecognitionImpl::FaceRecognitionImpl(const FaceRecognitionContext &context) 
     const char *storage_path_ptr = getenv("MACE_INTERNAL_STORAGE_PATH");
     const std::string storage_path =
         std::string(storage_path_ptr == nullptr ?
-                    "/data/local/tmp/mace_run/interior" : storage_path_ptr);
+                    "/data/local/tmp" : storage_path_ptr);
     gpu_context = mace::GPUContextBuilder()
         .SetStoragePath(storage_path)
         .Finalize();
@@ -72,7 +72,7 @@ FaceRecognitionImpl::FaceRecognitionImpl(const FaceRecognitionContext &context) 
   }
 #endif  // MACEKIT_ENABLE_OPENCL
 
-  mace::CreateMaceEngineFromCode("mobile_facenet",
+  mace::CreateMaceEngineFromCode("face_recognition",
                                  nullptr,
                                  0,
                                  mace_input_nodes,
