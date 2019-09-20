@@ -15,6 +15,8 @@
 #ifndef MACEKIT_INCLUDE_TYPE_H_
 #define MACEKIT_INCLUDE_TYPE_H_
 
+namespace mace_kit {
+
 enum DeviceType { CPU = 0, GPU = 2, HEXAGON = 3, HTA = 4 };
 
 enum CPUAffinityPolicy {
@@ -24,5 +26,7 @@ enum CPUAffinityPolicy {
   AFFINITY_HIGH_PERFORMANCE = 3,
   AFFINITY_POWER_SAVE = 4,
 };
+
+}  // namespace mace_kit
 
 #endif  // MACEKIT_INCLUDE_TYPE_H_

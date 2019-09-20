@@ -15,10 +15,14 @@
 #ifndef MACEKIT_CONTEXT_H_
 #define MACEKIT_CONTEXT_H_
 
+namespace mace_kit {
+
 struct MACEKIT_EXPORT Context {
-    DeviceType device_type;
-    int thread_count;
-    CPUAffinityPolicy cpu_affinity_policy;
+  DeviceType device_type;
+  int thread_count;
+  CPUAffinityPolicy cpu_affinity_policy;
 };
+
+}
 
 #endif  // MACEKIT_CONTEXT_H_

@@ -4,7 +4,7 @@ set -e
 
 # build for host
 BUILD_DIR=cmake-build/host
-rm -rf ${BUILD_DIR} && mkdir -p ${BUILD_DIR} && cd ${BUILD_DIR}
+mkdir -p ${BUILD_DIR} && cd ${BUILD_DIR}
 cmake -DCMAKE_INSTALL_PREFIX=install \
       ../..
 make -j6 VERBOSE=1 && make install

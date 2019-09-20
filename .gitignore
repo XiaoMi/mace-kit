@@ -3,4 +3,5 @@ cmake-build/
 build/
 .idea/
 ckpt/
+docs/_build/
 
