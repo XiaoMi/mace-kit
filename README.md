@@ -8,7 +8,8 @@ Feature List
 
 - [x] Face Detection
 - [x] Face Recognition
- 
+- [x] Speech Recognition
+
 How to build
 -------------
 
@@ -19,7 +20,7 @@ tool/cmake-build-android-armeabi-v7a.sh
 
 Test on android
 ```bash
-tool/cctest.sh
+tool/cctest-android.sh
 ```
 
 For more information, read the documentation.

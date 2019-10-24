@@ -1,0 +1,4955 @@
+diff --git a/src/Makefile b/src/Makefile
+index 07b7947..c5e9a23 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -9,7 +9,7 @@ SUBDIRS = base matrix util feat cudafeat tree gmm transform \
+           bin fstbin gmmbin fgmmbin featbin cudafeatbin \
+           nnetbin latbin sgmm2 sgmm2bin nnet2 nnet3 rnnlm chain nnet3bin nnet2bin kwsbin \
+           ivector ivectorbin online2 online2bin lmbin chainbin rnnlmbin \
+-          cudadecoder cudadecoderbin
++          cudadecoder cudadecoderbin mace
+ 
+ MEMTESTDIRS = base matrix util feat cudafeat tree gmm transform \
+           fstext hmm lm decoder lat nnet kws chain \
+@@ -31,7 +31,7 @@ include kaldi.mk
+ 
+ # Reset the default goal, so that the all target will become default
+ .DEFAULT_GOAL :=
+-all: $(SUBDIRS) matrix/test
++all: $(SUBDIRS) #matrix/test
+ 	-echo Done
+ 
+ mklibdir:
+@@ -179,3 +179,5 @@ online2: decoder gmm transform feat matrix util base lat hmm tree ivector cudama
+ kws: base util hmm tree matrix lat
+ cudadecoder:  cudamatrix cudafeat online2 nnet3 ivector feat fstext lat chain transform
+ cudadecoderbin: cudadecoder cudafeat cudamatrix online2 nnet3 ivector feat fstext lat chain transform
++#4)Dependencies for kaldi-mace
++mace: base util matrix decoder ivector feat lat hmm gmm transform tree cudamatrix fstext online2
+diff --git a/src/configure b/src/configure
+index 7015946..80e1627 100755
+--- a/src/configure
++++ b/src/configure
+@@ -98,6 +98,9 @@ Configuration options:
+   --host=HOST           Host triple in the format 'cpu-vendor-os'
+                         If provided, it is prepended to all toolchain programs.
+   --android-incdir=DIR  Android include directory
++  --mace-libdir=DIR     MACE library directory
++  --mace-incdir=DIR     MACE include directory
++  --static-mace         Build with static MACE libraries [default=no]
+ 
+ Following environment variables can be used to override the default toolchain.
+   CXX         C++ compiler [default=g++]
+@@ -312,10 +315,10 @@ function linux_configure_mkl_extra {
+ 
+   declare -A extra_libs
+   extra_libs=(
+-    [sequential]="-ldl -lpthread -lm"
+-    [gomp]="-lgomp -ldl -lpthread -lm"
+-    [iomp]="-ldl -lpthread -lm"
+-    [tbb]=" -ldl -lpthread -lm "
++    [sequential]="-ldl -pthread -lm"
++    [gomp]="-lgomp -ldl -pthread -lm"
++    [iomp]="-ldl -pthread -lm"
++    [tbb]=" -ldl -pthread -lm "
+   )
+   echo "$linkline ${extra_libs[$threaded]}"
+ }
+@@ -709,6 +712,31 @@ function linux_configure_atlas_static {
+   echo "Successfully configured for Linux [static libraries] with ATLASLIBS =$ATLASLIBS"
+ }
+ 
++function linux_configure_mace {
++  [ ! -z "$MACELIBDIR" ] || MACELIBDIR=`pwd`/../tools/libmace
++  [ ! -z "$MACEINCDIR" ] || MACEINCDIR="$MACELIBDIR"/include
++
++  if $static_mace; then
++    mace_type=a
++  else
++    mace_type=so
++  fi
++
++  if [ ! -f "$MACELIBDIR/libmace.${mace_type}" ]; then
++    failure "Could not find the Mace library $MACELIBDIR/libmace.${mace_type}"
++  else
++    echo >> kaldi.mk
++    echo CXXFLAGS += -DHAVE_MACE -I${MACEINCDIR} >> kaldi.mk
++    if $static_mace; then
++      echo MACELIBS = $MACELIBDIR/libmace.a >> kaldi.mk
++    else
++      echo MACE_LDLIBS += "-L${MACELIBDIR} -lmace" >> kaldi.mk
++      echo MACE_LDFLAGS += "-Wl,-rpath=${MACELIBDIR} -Wl,-s -fvisibility=hidden -fvisibility-inlines-hidden -fno-rtti" >> kaldi.mk
++    fi
++    echo "Successfully configured with Mace at $MACELIBDIR, and include $MACEINCDIR, (static=[$static_mace])"
++  fi
++}
++
+ #############################    CONFIGURATION    #############################
+ 
+ # If configuration sets any of these variables, we will switch the external
+@@ -720,7 +748,9 @@ MATHLIB=
+ MKLLIBDIR=
+ MKLROOT=
+ OPENBLASROOT=
+-
++MACELIBS=
++MACELIBDIR=
++MACEINCDIR=
+ # This variable identifies the type of system where built programs and
+ # libraries will run. It is set by the configure script when cross compiling.
+ HOST=
+@@ -749,6 +779,8 @@ static_math=false
+ threaded_atlas=false
+ mkl_threading=sequential
+ android=false
++use_mace=false
++static_mace=false
+ 
+ FSTROOT=`rel2abs ../tools/openfst`
+ CUBROOT=`rel2abs ../tools/cub`
+@@ -898,10 +930,25 @@ do
+     threaded_math=false;
+     static_math=true;
+     static_fst=true;
+-    dynamic_kaldi=false;
+     MATHLIB='OPENBLAS';
+     GetSwitchExistingPathOrDie ANDROIDINC "$1"
+     shift;;
++  --mace-incdir=*)
++    GetSwitchExistingPathOrDie MACEINCDIR "$1"
++    shift ;;
++  --mace-libdir=*)
++    use_mace=true
++    GetSwitchExistingPathOrDie MACELIBDIR "$1"
++    shift ;;
++  --static-mace)
++    static_mace=true;
++    shift ;;
++  --static-mace=yes)
++    static_mace=true;
++    shift ;;
++  --static-mace=no)
++    static_mace=false;
++    shift ;;
+   *)  echo "Unknown argument: $1, exiting"; usage; exit 1 ;;
+   esac
+ done
+@@ -1062,6 +1109,8 @@ fi
+ echo "OPENFSTINC = $FSTROOT/include" >> kaldi.mk
+ if $static_fst ; then
+   OPENFSTLIBS="$FSTROOT/lib/libfst.a"
++  echo >> kaldi.mk
++  echo CXXFLAGS += -fPIC >> kaldi.mk
+ else
+   if [ "`uname`" == "Darwin"  ]; then
+     OPENFSTLIBS="$FSTROOT/lib/libfst.dylib"
+@@ -1090,7 +1139,6 @@ else
+   echo "CUBROOT = $CUBROOT" >> kaldi.mk
+ fi
+ 
+-
+ # OS-specific steps given below append to kaldi.mk
+ echo "Doing OS specific configurations ..."
+ 
+@@ -1120,6 +1168,8 @@ if $android ; then
+ 
+   cat makefiles/android_openblas.mk >> kaldi.mk
+ 
++  $use_mace &&linux_configure_mace
++
+   echo "Successfully configured for Android with OpenBLAS from $OPENBLASROOT."
+ 
+ elif [ "`uname`" == "Darwin" ]; then
+@@ -1343,6 +1393,7 @@ elif [ "`uname`" == "Linux" ]; then
+   fi
+   $use_cuda && configure_cuda
+   linux_configure_speex
++  $use_mace &&linux_configure_mace
+ else
+   failure "Could not detect the platform or we have not yet worked out the
+   appropriate configuration for this platform. Please contact the developers."
+diff --git a/src/mace/Makefile b/src/mace/Makefile
+new file mode 100644
+index 0000000..3c07939
+--- /dev/null
++++ b/src/mace/Makefile
+@@ -0,0 +1,26 @@
++
++all:
++
++include ../kaldi.mk
++
++LDFLAGS += $(CUDA_LDFLAGS)
++LDLIBS += $(CUDA_LDLIBS)
++
++LDLIBS += $(MACE_LDLIBS)
++LDFLAGS += $(MACE_LDFLAGS)
++
++TESTFILES =
++
++OBJFILES = mace-computer.o mace-am-decodable-simple.o mace-decodable-simple-looped.o \
++           mace-decodable-online-looped.o mace-online-nnet2-decodable.o \
++           mace-online-nnet2-decoding.o mace-online-nnet3-decoding.o kaldi-mace.o
++
++LIBNAME = kaldi-mace
++
++ADDLIBS = ../online2/kaldi-online2.a ../ivector/kaldi-ivector.a \
++          ../decoder/kaldi-decoder.a ../lat/kaldi-lat.a ../feat/kaldi-feat.a \
++          ../fstext/kaldi-fstext.a ../hmm/kaldi-hmm.a ../gmm/kaldi-gmm.a ../tree/kaldi-tree.a \
++          ../util/kaldi-util.a ../matrix/kaldi-matrix.a ../transform/kaldi-transform.a\
++          ../base/kaldi-base.a
++
++include ../makefiles/mace_rules.mk
+diff --git a/src/mace/kaldi-mace.cc b/src/mace/kaldi-mace.cc
+new file mode 100644
+index 0000000..2d2c659
+--- /dev/null
++++ b/src/mace/kaldi-mace.cc
+@@ -0,0 +1,298 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include "kaldi-mace.h"
++
++#include "feat/wave-reader.h"
++#include "lat/lattice-functions.h"
++#include "online2/online-timing.h"
++#include "mace-computer.h"
++#include "mace-online-nnet3-decoding.h"
++
++namespace kaldi {
++
++std::string GetDiagnosticsAndPrintOutput(const std::string &utt,
++                                  const fst::SymbolTable *word_syms,
++                                  const CompactLattice &clat,
++                                  int64 *tot_num_frames,
++                                  double *tot_like) {
++  std::string result = "";
++  if (clat.NumStates() == 0) {
++    KALDI_WARN << "Empty lattice.";
++    return result;
++  }
++  CompactLattice best_path_clat;
++  CompactLatticeShortestPath(clat, &best_path_clat);
++
++  Lattice best_path_lat;
++  ConvertLattice(best_path_clat, &best_path_lat);
++
++  double likelihood;
++  LatticeWeight weight;
++  int32 num_frames;
++  std::vector<int32> alignment;
++  std::vector<int32> words;
++  GetLinearSymbolSequence(best_path_lat, &alignment, &words, &weight);
++  num_frames = static_cast<int32>(alignment.size());
++  likelihood = -(weight.Value1() + weight.Value2());
++  *tot_num_frames += num_frames;
++  *tot_like += likelihood;
++  KALDI_VLOG(2) << "Likelihood per frame for utterance " << utt << " is "
++                << (likelihood / num_frames) << " over " << num_frames
++                << " frames.";
++
++  if (word_syms != nullptr) {
++    std::cerr << utt << ' ';
++    for (const auto &w: words) {
++      std::string s = word_syms->Find(w);
++      if (s.empty())
++        KALDI_ERR << "Word-id " << w << " not in symbol table.";
++      std::cerr << s << ' ';
++      result.append(s + ' ');
++    }
++    std::cerr << std::endl;
++  }
++  return result;
++}
++
++std::string MaceNnet3WavDecode(const std::string &configure_file,
++                               const std::string &fst_filename,
++                               const std::string &wav_file,
++                               const std::string &prediction_file,
++                               const std::string &mace_log_level) {
++  using namespace fst;
++  using namespace MACE;
++
++  const char *usage =
++      "Reads in wav file(s) and simulates online decoding with neural nets\n"
++          "(nnet3 setup with MaceEngine), with optional iVector-based speaker adaptation and\n"
++          "optional endpointing.  Note: some configuration values and inputs are\n"
++          "set via config files whose filenames are passed as options\n"
++          "\n"
++          "Usage: mace-online-decode [options] <fst-in> "
++          "<spk2utt-rspecifier> <wav-rspecifier> <lattice-wspecifier>\n"
++          "The spk2utt-rspecifier can just be <utterance-id> <utterance-id> if\n"
++          "you want to decode utterance by utterance.\n";
++
++  ParseOptions po(usage);
++  std::string word_syms_rxfilename;
++
++  float chunk_length_secs = 0.18;
++  bool do_endpointing = false;
++  bool online = true;
++
++  // feature_opts includes configuration for the iVector adaptation,
++  // as well as the basic features.
++  OnlineNnet2FeaturePipelineConfig feature_opts;
++  MaceComputationOptions decodable_opts;
++  LatticeFasterDecoderConfig decoder_opts;
++  OnlineEndpointConfig endpoint_opts;
++  MaceModelInfo model_info;
++
++  po.Register("chunk-length", &chunk_length_secs,
++              "Length of chunk size in seconds, that we process.  Set to <= 0 "
++                  "to use all input in one chunk.");
++  po.Register("word-symbol-table", &word_syms_rxfilename,
++              "Symbol table for words [for debug output]");
++  po.Register("do-endpointing", &do_endpointing,
++              "If true, apply endpoint detection");
++  po.Register("online", &online,
++              "You can set this to false to disable online iVector estimation "
++                  "and have all the data for each utterance used, even at "
++                  "utterance start.  This is useful where you just want the best "
++                  "results and don't care about online operation.  Setting this to "
++                  "false has the same effect as setting "
++                  "--use-most-recent-ivector=true and --greedy-ivector-extractor=true "
++                  "in the file given to --ivector-extraction-config, and "
++                  "--chunk-length=-1.");
++
++  feature_opts.Register(&po);
++  decodable_opts.Register(&po);
++  decoder_opts.Register(&po);
++  endpoint_opts.Register(&po);
++  model_info.Register(&po);
++  po.ReadConfigFile(configure_file);
++
++  if (!mace_log_level.empty()) {
++    setenv("MACE_CPP_MIN_VLOG_LEVEL", mace_log_level.c_str(), 0);
++  }
++
++  string spk2utt_rspecifier = "ark:echo utter1 utter1|";
++  std::string wav_rspecifier = "scp:echo utter1 ";
++  wav_rspecifier.append(wav_file);
++  wav_rspecifier.append("|");
++
++  bool save_prediction = !prediction_file.empty();
++
++  std::string clat_wspecifier = "ark,t:";
++  if (save_prediction) {
++    clat_wspecifier.append(prediction_file);
++  }
++  OnlineNnet2FeaturePipelineInfo feature_info(feature_opts);
++
++  if (!online) {
++    feature_info.ivector_extractor_info.use_most_recent_ivector = true;
++    feature_info.ivector_extractor_info.greedy_ivector_extractor = true;
++    chunk_length_secs = -1.0f;
++  }
++
++  model_info.left_context = decodable_opts.left_context;
++  model_info.right_context = decodable_opts.right_context;
++  model_info.modulus = decodable_opts.modulus;
++  model_info.ExtractInfo();
++  MaceComputer computer(model_info); // output shapes
++
++  TransitionModel trans_model;
++  {
++    bool binary;
++    Input ki(model_info.trans_model, &binary);
++    trans_model.Read(ki.Stream(), binary);
++  }
++
++  // this object contains precomputed stuff that is used by all decodable
++  // objects.  It takes a pointer to am_nnet because if it has iVectors it has
++  // to modify the nnet to accept iVectors at intervals.
++  MaceDecodableNnetSimpleLoopedInfo decodable_info(decodable_opts,
++                                                   &computer);
++
++  fst::Fst<fst::StdArc> *decode_fst = ReadFstKaldiGeneric(fst_filename);
++
++  fst::SymbolTable *word_syms = nullptr;
++  if (!word_syms_rxfilename.empty())
++    if (!(word_syms = fst::SymbolTable::ReadText(word_syms_rxfilename)))
++      KALDI_ERR << "Could not read symbol table from file "
++                << word_syms_rxfilename;
++
++  int32 num_done = 0, num_err = 0;
++  double tot_like = 0.0;
++  int64 num_frames = 0;
++
++  SequentialTokenVectorReader spk2utt_reader(spk2utt_rspecifier);
++  RandomAccessTableReader<WaveHolder> wav_reader(wav_rspecifier);
++  CompactLatticeWriter clat_writer(clat_wspecifier);
++
++  OnlineTimingStats timing_stats;
++
++  std::string result;
++  for (; !spk2utt_reader.Done(); spk2utt_reader.Next()) {
++    std::string spk = spk2utt_reader.Key();
++    const std::vector<std::string> &uttlist = spk2utt_reader.Value();
++    OnlineIvectorExtractorAdaptationState adaptation_state(
++        feature_info.ivector_extractor_info);
++    for (auto &utt: uttlist) {
++      if (!wav_reader.HasKey(utt)) {
++        KALDI_WARN << "Did not find audio for utterance " << utt;
++        num_err++;
++        continue;
++      }
++      const WaveData &wave_data = wav_reader.Value(utt);
++      // get the data for channel zero (if the signal is not mono, we only
++      // take the first channel).
++      SubVector<BaseFloat> data(wave_data.Data(), 0);
++
++      OnlineNnet2FeaturePipeline feature_pipeline(feature_info);
++      feature_pipeline.SetAdaptationState(adaptation_state);
++
++      OnlineSilenceWeighting silence_weighting(
++          trans_model,
++          feature_info.silence_weighting_config,
++          decodable_opts.frame_subsampling_factor);
++
++      MaceSingleUtteranceNnet3Decoder decoder(decoder_opts,
++                                              trans_model,
++                                              decodable_info,
++                                              *decode_fst,
++                                              &feature_pipeline);
++      OnlineTimer decoding_timer(utt);
++
++      BaseFloat samp_freq = wave_data.SampFreq();
++      int32 chunk_length;
++      if (chunk_length_secs > 0) {
++        chunk_length = int32(samp_freq * chunk_length_secs);
++        if (chunk_length == 0) chunk_length = 1;
++      } else {
++        chunk_length = std::numeric_limits<int32>::max();
++      }
++
++      int32 samp_offset = 0;
++      std::vector<std::pair<int32, BaseFloat> > delta_weights;
++
++      while (samp_offset < data.Dim()) {
++        int32 samp_remaining = data.Dim() - samp_offset;
++        int32 num_samp = chunk_length < samp_remaining ? chunk_length
++                                                       : samp_remaining;
++
++        SubVector<BaseFloat> wave_part(data, samp_offset, num_samp);
++        feature_pipeline.AcceptWaveform(samp_freq, wave_part);
++
++        samp_offset += num_samp;
++        decoding_timer.WaitUntil(samp_offset / samp_freq);
++        if (samp_offset == data.Dim()) {
++          // no more input. flush out last frames
++          feature_pipeline.InputFinished();
++        }
++
++        if (silence_weighting.Active() &&
++            feature_pipeline.IvectorFeature() != NULL) {
++          silence_weighting.ComputeCurrentTraceback(decoder.Decoder());
++          silence_weighting.GetDeltaWeights(feature_pipeline.NumFramesReady(),
++                                            &delta_weights);
++          feature_pipeline.IvectorFeature()->UpdateFrameWeights(delta_weights);
++        }
++
++        decoder.AdvanceDecoding();
++
++        if (do_endpointing && decoder.EndpointDetected(endpoint_opts)) {
++          break;
++        }
++      }
++      decoder.FinalizeDecoding();
++
++      CompactLattice clat;
++      bool end_of_utterance = true;
++      decoder.GetLattice(end_of_utterance, &clat);
++
++      const string txt = GetDiagnosticsAndPrintOutput(utt, word_syms, clat,
++                                   &num_frames, &tot_like);
++      result.append(txt + "\n");
++      decoding_timer.OutputStats(&timing_stats);
++
++      // In an application you might avoid updating the adaptation state if
++      // you felt the utterance had low confidence.  See lat/confidence.h
++      feature_pipeline.GetAdaptationState(&adaptation_state);
++
++      // we want to output the lattice with un-scaled acoustics.
++      BaseFloat inv_acoustic_scale =
++          1.0f / decodable_opts.acoustic_scale;
++      ScaleLattice(AcousticLatticeScale(inv_acoustic_scale), &clat);
++
++      if (save_prediction) clat_writer.Write(utt, clat);
++      KALDI_LOG << "Decoded utterance " << utt;
++      num_done++;
++    }
++  }
++  timing_stats.Print(online);
++
++  KALDI_LOG << "Decoded " << num_done << " utterances, "
++            << num_err << " with errors.";
++  KALDI_LOG << "Overall likelihood per frame was " << (tot_like / num_frames)
++            << " per frame over " << num_frames << " frames.";
++  delete decode_fst;
++  delete word_syms; // will delete if non-NULL.
++  return result;
++}
++
++} // namespace kaldi
++#endif
+diff --git a/src/mace/kaldi-mace.h b/src/mace/kaldi-mace.h
+new file mode 100644
+index 0000000..2acb2d9
+--- /dev/null
++++ b/src/mace/kaldi-mace.h
+@@ -0,0 +1,34 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_KALDI_MACE_H_
++#define MACE_KALDI_MACE_H_
++
++#include <string>
++
++#ifndef KALDI_MACE_API
++#define KALDI_MACE_API __attribute__((visibility("default")))
++#endif
++namespace kaldi {
++
++KALDI_MACE_API std::string MaceNnet3WavDecode(
++    const std::string &configure_file,
++    const std::string &fst_filename,
++    const std::string &wav_file,
++    const std::string &prediction_file,
++    const std::string &log_level="");
++}
++
++#endif  // MACE_KALDI_MACE_H_
++
+diff --git a/src/mace/mace-am-decodable-simple.cc b/src/mace/mace-am-decodable-simple.cc
+new file mode 100644
+index 0000000..7c1acb1
+--- /dev/null
++++ b/src/mace/mace-am-decodable-simple.cc
+@@ -0,0 +1,276 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include "mace-am-decodable-simple.h"
++
++namespace kaldi {
++namespace MACE {
++
++DecodableMaceSimple::DecodableMaceSimple(
++    const MaceSimpleComputationOptions &opts,
++    MaceComputer *computer,
++    const VectorBase<BaseFloat> &priors,
++    const MatrixBase<BaseFloat> &feats,
++    const VectorBase<BaseFloat> *ivector,
++    const MatrixBase<BaseFloat> *online_ivectors,
++    int32 online_ivector_period):
++    opts_(opts),
++    output_dim_(0),
++    log_priors_(priors),
++    feats_(feats),
++    ivector_(ivector),
++    online_ivector_feats_(online_ivectors),
++    online_ivector_period_(online_ivector_period),
++    current_log_post_subsampled_offset_(0),
++    computer_(computer) {
++  num_subsampled_frames_ =
++      (feats_.NumRows() + opts_.frame_subsampling_factor - 1) /
++      opts_.frame_subsampling_factor;
++  KALDI_ASSERT(!(ivector != NULL && online_ivectors != NULL));
++  KALDI_ASSERT(!(online_ivectors != NULL && online_ivector_period <= 0 &&
++                 "You need to set the --online-ivector-period option!"));
++  log_priors_.ApplyLog();
++  CheckAndFixConfigs();
++}
++
++
++DecodableAmMaceSimple::DecodableAmMaceSimple(
++    const MaceSimpleComputationOptions &opts,
++    const TransitionModel &trans_model,
++    MaceComputer *computer,
++    const VectorBase<BaseFloat> &priors,
++    const MatrixBase<BaseFloat> &feats,
++    const VectorBase<BaseFloat> *ivector,
++    const MatrixBase<BaseFloat> *online_ivectors,
++    int32 online_ivector_period):
++    decodable_nnet_(opts, computer, priors,
++                    feats,
++                    ivector, online_ivectors,
++                    online_ivector_period),
++    trans_model_(trans_model) {
++}
++
++BaseFloat DecodableAmMaceSimple::LogLikelihood(int32 frame,
++                                               int32 transition_id) {
++  int32 pdf_id = trans_model_.TransitionIdToPdfFast(transition_id);
++  return decodable_nnet_.GetOutput(frame, pdf_id);
++}
++
++int32 DecodableMaceSimple::GetIvectorDim() const {
++  if (ivector_ != NULL)
++    return ivector_->Dim();
++  else if (computer_ != NULL)
++    return computer_->IvectorDim();
++  else
++    return 0;
++}
++
++void DecodableMaceSimple::EnsureFrameIsComputed(int32 subsampled_frame) {
++  KALDI_ASSERT(subsampled_frame >= 0 &&
++               subsampled_frame < num_subsampled_frames_);
++  int32 feature_dim = feats_.NumCols(),
++      ivector_dim = GetIvectorDim(),
++      nnet_input_dim = GetInputDim(),
++      nnet_ivector_dim = std::max<int32>(0, ivector_dim);
++  if (feature_dim != nnet_input_dim)
++    KALDI_ERR << "Neural net expects 'input' features with dimension "
++              << nnet_input_dim << " but you provided "
++              << feature_dim;
++  if (ivector_dim != std::max<int32>(0, ivector_dim))
++    KALDI_ERR << "Neural net expects 'ivector' features with dimension "
++              << nnet_ivector_dim << " but you provided " << ivector_dim;
++
++  int32 current_subsampled_frames_computed = current_log_post_.NumRows(),
++      current_subsampled_offset = current_log_post_subsampled_offset_;
++  KALDI_ASSERT(subsampled_frame < current_subsampled_offset ||
++               subsampled_frame >= current_subsampled_offset +
++               current_subsampled_frames_computed);
++
++  // all subsampled frames pertain to the output of the network,
++  // they are output frames divided by opts_.frame_subsampling_factor.
++  int32 subsampling_factor = opts_.frame_subsampling_factor,
++      subsampled_frames_per_chunk = opts_.frames_per_chunk / subsampling_factor,
++      start_subsampled_frame = subsampled_frame,
++      num_subsampled_frames = std::min<int32>(num_subsampled_frames_ -
++                                              start_subsampled_frame,
++                                              subsampled_frames_per_chunk),
++      last_subsampled_frame = start_subsampled_frame + num_subsampled_frames - 1;
++  KALDI_ASSERT(num_subsampled_frames > 0);
++  // the output-frame numbers are the subsampled-frame numbers
++  int32 first_output_frame = start_subsampled_frame * subsampling_factor,
++      last_output_frame = last_subsampled_frame * subsampling_factor;
++
++  KALDI_ASSERT(opts_.extra_left_context >= 0 && opts_.extra_right_context >= 0);
++  int32 extra_left_context = opts_.extra_left_context,
++      extra_right_context = opts_.extra_right_context;
++  if (first_output_frame == 0 && opts_.extra_left_context_initial >= 0)
++    extra_left_context = opts_.extra_left_context_initial;
++  if (last_subsampled_frame == num_subsampled_frames_ - 1 &&
++      opts_.extra_right_context_final >= 0)
++    extra_right_context = opts_.extra_right_context_final;
++  int32 left_context = nnet_left_context_ + extra_left_context,
++      right_context = nnet_right_context_ + extra_right_context;
++  int32 first_input_frame = first_output_frame - left_context,
++      last_input_frame = last_output_frame + right_context,
++      num_input_frames = last_input_frame + 1 - first_input_frame;
++  Vector<BaseFloat> ivector;
++  GetCurrentIvector(first_output_frame,
++                    last_output_frame - first_output_frame,
++                    &ivector);
++
++  if (first_input_frame >= 0 &&
++      last_input_frame < feats_.NumRows()) {
++    SubMatrix<BaseFloat> input_feats(feats_.RowRange(first_input_frame,
++                                                     num_input_frames));
++    DoNnetComputation(first_input_frame, input_feats, ivector,
++                      first_output_frame, num_subsampled_frames);
++  } else {
++    Matrix<BaseFloat> feats_block(num_input_frames, feats_.NumCols());
++    int32 tot_input_feats = feats_.NumRows();
++    for (int32 i = 0; i < num_input_frames; i++) {
++      SubVector<BaseFloat> dest(feats_block, i);
++      int32 t = i + first_input_frame;
++      if (t < 0) t = 0;
++      if (t >= tot_input_feats) t = tot_input_feats - 1;
++      const SubVector<BaseFloat> src(feats_, t);
++      dest.CopyFromVec(src);
++    }
++    DoNnetComputation(first_input_frame, feats_block, ivector,
++                      first_output_frame, num_subsampled_frames);
++  }
++}
++
++// note: in the normal case (with no frame subsampling) you can ignore the
++// 'subsampled_' in the variable name.
++void DecodableMaceSimple::GetOutputForFrame(int32 subsampled_frame,
++                                            VectorBase<BaseFloat> *output) {
++  if (subsampled_frame < current_log_post_subsampled_offset_ ||
++      subsampled_frame >= current_log_post_subsampled_offset_ +
++      current_log_post_.NumRows())
++    EnsureFrameIsComputed(subsampled_frame);
++  output->CopyFromVec(current_log_post_.Row(
++      subsampled_frame - current_log_post_subsampled_offset_));
++}
++
++void DecodableMaceSimple::GetCurrentIvector(int32 output_t_start,
++                                            int32 num_output_frames,
++                                            Vector<BaseFloat> *ivector) {
++  if (ivector_ != NULL) {
++    *ivector = *ivector_;
++    return;
++  } else if (online_ivector_feats_ == NULL) {
++    return;
++  }
++  KALDI_ASSERT(online_ivector_period_ > 0);
++  // frame_to_search is the frame that we want to get the most recent iVector
++  // for.  We choose a point near the middle of the current window, the concept
++  // being that this is the fairest comparison to nnet2.   Obviously we could do
++  // better by always taking the last frame's iVector, but decoding with
++  // 'online' ivectors is only really a mechanism to simulate online operation.
++  int32 frame_to_search = output_t_start + num_output_frames / 2;
++  int32 ivector_frame = frame_to_search / online_ivector_period_;
++  KALDI_ASSERT(ivector_frame >= 0);
++  if (ivector_frame >= online_ivector_feats_->NumRows()) {
++    int32 margin = ivector_frame - (online_ivector_feats_->NumRows() - 1);
++    if (margin * online_ivector_period_ > 50) {
++      // Half a second seems like too long to be explainable as edge effects.
++      KALDI_ERR << "Could not get iVector for frame " << frame_to_search
++                << ", only available till frame "
++                << online_ivector_feats_->NumRows()
++                << " * ivector-period=" << online_ivector_period_
++                << " (mismatched --online-ivector-period?)";
++    }
++    ivector_frame = online_ivector_feats_->NumRows() - 1;
++  }
++  *ivector = online_ivector_feats_->Row(ivector_frame);
++}
++
++
++void DecodableMaceSimple::DoNnetComputation(
++    int32 input_t_start,
++    const MatrixBase<BaseFloat> &input,
++    const VectorBase<BaseFloat> &ivector,
++    int32 output_t_start,
++    int32 num_subsampled_frames) {
++
++//  bool shift_time = true; // shift the 'input' and 'output' to a consistent
++  // time, to take advantage of caching in the compiler.
++  // An optimization.
++//  int32 time_offset = (shift_time ? -output_t_start : 0);
++
++  int32 subsample = opts_.frame_subsampling_factor;
++
++  Matrix<BaseFloat> input_feats(input);
++  computer_->AcceptInput(&input_feats);
++  Matrix<BaseFloat> ivector_feats;
++
++  if (ivector.Dim() > 0) {
++    ivector_feats.Resize(1, ivector.Dim());
++    ivector_feats.Row(0).CopyFromVec(ivector);
++    computer_->AcceptIvector(&ivector_feats);
++  }
++  computer_->Run();
++
++  Matrix<BaseFloat> output;
++  computer_->GetOutput(&output);
++  // subtract log-prior (divide by prior)
++  if (log_priors_.Dim() != 0)
++    output.AddVecToRows(-1.0f, log_priors_);
++  // apply the acoustic scale
++  output.Scale(opts_.acoustic_scale);
++  current_log_post_.Resize(0, 0);
++  // the following statement just swaps the pointers if we're not using a GPU.
++  output.Swap(&current_log_post_);
++  current_log_post_subsampled_offset_ = output_t_start / subsample;
++}
++
++void DecodableMaceSimple::CheckAndFixConfigs() {
++  static bool warned_frames_per_chunk = false;
++  int32 nnet_modulus = computer_->Modulus();
++  if (opts_.frame_subsampling_factor < 1 ||
++      opts_.frames_per_chunk < 1)
++    KALDI_ERR << "--frame-subsampling-factor and --frames-per-chunk must be > 0";
++  KALDI_ASSERT(nnet_modulus > 0);
++  int32 n = Lcm(opts_.frame_subsampling_factor, nnet_modulus);
++
++  if (opts_.frames_per_chunk % n != 0) {
++    // round up to the nearest multiple of n.
++    int32 frames_per_chunk = n * ((opts_.frames_per_chunk + n - 1) / n);
++    if (!warned_frames_per_chunk) {
++      warned_frames_per_chunk = true;
++      if (nnet_modulus == 1) {
++        // simpler error message.
++        KALDI_LOG << "Increasing --frames-per-chunk from "
++                  << opts_.frames_per_chunk << " to "
++                  << frames_per_chunk << " to make it a multiple of "
++                  << "--frame-subsampling-factor="
++                  << opts_.frame_subsampling_factor;
++      } else {
++        KALDI_LOG << "Increasing --frames-per-chunk from "
++                  << opts_.frames_per_chunk << " to "
++                  << frames_per_chunk << " due to "
++                  << "--frame-subsampling-factor="
++                  << opts_.frame_subsampling_factor << " and "
++                  << "nnet shift-invariance modulus = " << nnet_modulus;
++      }
++    }
++    opts_.frames_per_chunk = frames_per_chunk;
++  }
++
++}
++
++} // namespace MACE
++} // namespace kaldi
++#endif
+diff --git a/src/mace/mace-am-decodable-simple.h b/src/mace/mace-am-decodable-simple.h
+new file mode 100644
+index 0000000..e8c62c3
+--- /dev/null
++++ b/src/mace/mace-am-decodable-simple.h
+@@ -0,0 +1,297 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef KALDI_MACE_MACE_AM_DECODABLE_SIMPLE_H_
++#define KALDI_MACE_MACE_AM_DECODABLE_SIMPLE_H_
++
++#include <vector>
++
++#include "base/kaldi-common.h"
++#include "hmm/transition-model.h"
++#include "itf/decodable-itf.h"
++#include "mace-computer.h"
++#include "util/kaldi-io.h"
++
++namespace kaldi {
++namespace MACE {
++
++struct MaceSimpleComputationOptions {
++  int32 extra_left_context;
++  int32 extra_right_context;
++  int32 extra_left_context_initial;
++  int32 extra_right_context_final;
++  int32 frame_subsampling_factor;
++  int32 frames_per_chunk;
++  BaseFloat acoustic_scale;
++  bool debug_computation;
++
++  MaceSimpleComputationOptions():
++      extra_left_context(0),
++      extra_right_context(0),
++      extra_left_context_initial(-1),
++      extra_right_context_final(-1),
++      frame_subsampling_factor(1),
++      frames_per_chunk(50),
++      acoustic_scale(0.1),
++      debug_computation(false) {
++  }
++
++  void Register(OptionsItf *opts) {
++    opts->Register("extra-left-context", &extra_left_context,
++                   "Number of frames of additional left-context to add on top "
++                   "of the neural net's inherent left context (may be useful in "
++                   "recurrent setups");
++    opts->Register("extra-right-context", &extra_right_context,
++                   "Number of frames of additional right-context to add on top "
++                   "of the neural net's inherent right context (may be useful in "
++                   "recurrent setups");
++    opts->Register("extra-left-context-initial", &extra_left_context_initial,
++                   "If >= 0, overrides the --extra-left-context value at the "
++                   "start of an utterance.");
++    opts->Register("extra-right-context-final", &extra_right_context_final,
++                   "If >= 0, overrides the --extra-right-context value at the "
++                   "end of an utterance.");
++    opts->Register("frame-subsampling-factor", &frame_subsampling_factor,
++                   "Required if the frame-rate of the output (e.g. in 'chain' "
++                   "models) is less than the frame-rate of the original "
++                   "alignment.");
++    opts->Register("acoustic-scale", &acoustic_scale,
++                   "Scaling factor for acoustic log-likelihoods (caution: is a no-op "
++                   "if set in the program nnet3-compute");
++    opts->Register("frames-per-chunk", &frames_per_chunk,
++                   "Number of frames in each chunk that is separately evaluated "
++                   "by the neural net.  Measured before any subsampling, if the "
++                   "--frame-subsampling-factor options is used (i.e. counts "
++                   "input frames");
++    opts->Register("debug-computation", &debug_computation, "If true, turn on "
++                   "debug for the actual computation (very verbose!)");
++
++
++  }
++};
++
++
++/*
++  This class handles the neural net computation; it's mostly accessed
++  via other wrapper classes.
++
++  Note: this class used to be called NnetDecodableBase.
++
++  It can accept just input features, or input features plus iVectors.  */
++class DecodableMaceSimple {
++ public:
++  /**
++     This constructor takes features as input, and you can either supply a
++     single iVector input, estimated in batch-mode ('ivector'), or 'online'
++     iVectors ('online_ivectors' and 'online_ivector_period', or none at all.
++     Note: it stores references to all arguments to the constructor, so don't
++     delete them till this goes out of scope.
++
++     @param [in] opts   The options class.  Warning: it includes an acoustic
++                        weight, whose default is 0.1; you may sometimes want to
++                        change this to 1.0.
++     @param [in] nnet   The neural net that we're going to do the computation with
++     @param [in] priors Vector of priors-- if supplied and nonempty, we subtract
++                        the log of these priors from the nnet output.
++     @param [in] feats  The input feature matrix.
++     @param [in] compiler  A pointer to the compiler object to use-- this enables the
++                        user to maintain a common object in the calling code that
++                        will cache computations across decodes.  Note: the compiler code
++                        has no locking mechanism (and it would be tricky to design one,
++                        as we'd need to lock the individual computations also),
++                        so the calling code has to make sure that if there are
++                        multiple threads, they do not share the same compiler
++                        object.
++     @param [in] ivector If you are using iVectors estimated in batch mode,
++                         a pointer to the iVector, else NULL.
++     @param [in] online_ivectors
++                        If you are using iVectors estimated 'online'
++                        a pointer to the iVectors, else NULL.
++     @param [in] online_ivector_period If you are using iVectors estimated 'online'
++                        (i.e. if online_ivectors != NULL) gives the periodicity
++                        (in frames) with which the iVectors are estimated.
++  */
++  DecodableMaceSimple(const MaceSimpleComputationOptions &opts,
++                      MaceComputer *computer,
++                      const VectorBase<BaseFloat> &priors,
++                      const MatrixBase<BaseFloat> &feats,
++                      const VectorBase<BaseFloat> *ivector = NULL,
++                      const MatrixBase<BaseFloat> *online_ivectors = NULL,
++                      int32 online_ivector_period = 1);
++
++
++  // returns the number of frames of likelihoods.  The same as feats_.NumRows()
++  // in the normal case (but may be less if opts_.frame_subsampling_factor !=
++  // 1).
++  inline int32 NumFrames() const { return num_subsampled_frames_; }
++
++  inline int32 OutputDim() const { return computer_->OutputDim(); }
++
++  // Gets the output for a particular frame, with 0 <= frame < NumFrames().
++  // 'output' must be correctly sized (with dimension OutputDim()).
++  void GetOutputForFrame(int32 frame, VectorBase<BaseFloat> *output);
++
++  // Gets the output for a particular frame and pdf_id, with
++  // 0 <= subsampled_frame < NumFrames(),
++  // and 0 <= pdf_id < OutputDim().
++  inline BaseFloat GetOutput(int32 subsampled_frame, int32 pdf_id) {
++    if (subsampled_frame < current_log_post_subsampled_offset_ ||
++        subsampled_frame >= current_log_post_subsampled_offset_ +
++                            current_log_post_.NumRows())
++      EnsureFrameIsComputed(subsampled_frame);
++    return current_log_post_(subsampled_frame -
++                             current_log_post_subsampled_offset_,
++                             pdf_id);
++  }
++ private:
++  KALDI_DISALLOW_COPY_AND_ASSIGN(DecodableMaceSimple);
++
++  // This call is made to ensure that we have the log-probs for this frame
++  // cached in current_log_post_.
++  void EnsureFrameIsComputed(int32 subsampled_frame);
++
++  // This function does the actual nnet computation; it is called from
++  // EnsureFrameIsComputed.  Any padding at file start/end is done by
++  // the caller of this function (so the input should exceed the output
++  // by a suitable amount of context).  It puts its output in current_log_post_.
++  void DoNnetComputation(int32 input_t_start,
++                         const MatrixBase<BaseFloat> &input_feats,
++                         const VectorBase<BaseFloat> &ivector,
++                         int32 output_t_start,
++                         int32 num_subsampled_frames);
++
++  // Gets the iVector that will be used for this chunk of frames, if we are
++  // using iVectors (else does nothing).  note: the num_output_frames is
++  // interpreted as the number of t value, which in the subsampled case is not
++  // the same as the number of subsampled frames (it would be larger by
++  // opts_.frame_subsampling_factor).
++  void GetCurrentIvector(int32 output_t_start,
++                         int32 num_output_frames,
++                         Vector<BaseFloat> *ivector);
++
++  // called from constructor
++  void CheckAndFixConfigs();
++
++  // returns dimension of the provided iVectors if supplied, or 0 otherwise.
++  int32 GetIvectorDim() const;
++
++  int32 GetInputDim() const { return computer_->InputDim(); };
++
++
++  MaceSimpleComputationOptions opts_;
++  int32 nnet_left_context_;
++  int32 nnet_right_context_;
++  int32 output_dim_;
++  // the log priors (or the empty vector if the priors are not set in the model)
++  Vector<BaseFloat> log_priors_;
++  const MatrixBase<BaseFloat> &feats_;
++  // note: num_subsampled_frames_ will equal feats_.NumRows() in the normal case
++  // when opts_.frame_subsampling_factor == 1.
++  int32 num_subsampled_frames_;
++
++  // ivector_ is the iVector if we're using iVectors that are estimated in batch
++  // mode.
++  const VectorBase<BaseFloat> *ivector_;
++
++  // online_ivector_feats_ is the iVectors if we're using online-estimated ones.
++  const MatrixBase<BaseFloat> *online_ivector_feats_;
++  // online_ivector_period_ helps us interpret online_ivector_feats_; it's the
++  // number of frames the rows of ivector_feats are separated by.
++  int32 online_ivector_period_;
++
++  // The current log-posteriors that we got from the last time we
++  // ran the computation.
++  Matrix<BaseFloat> current_log_post_;
++  // The time-offset of the current log-posteriors.  Note: if
++  // opts_.frame_subsampling_factor > 1, this will be measured in subsampled
++  // frames.
++  int32 current_log_post_subsampled_offset_;
++
++  MaceComputer *computer_;
++
++};
++
++class DecodableAmMaceSimple: public DecodableInterface {
++ public:
++  /**
++     This constructor takes features as input, and you can either supply a
++     single iVector input, estimated in batch-mode ('ivector'), or 'online'
++     iVectors ('online_ivectors' and 'online_ivector_period', or none at all.
++     Note: it stores references to all arguments to the constructor, so don't
++     delete them till this goes out of scope.
++
++     @param [in] opts   The options class.  Warning: it includes an acoustic
++                        weight, whose default is 0.1; you may sometimes want to
++                        change this to 1.0.
++     @param [in] trans_model  The transition model to use.  This takes care of the
++                        mapping from transition-id (which is an arg to
++                        LogLikelihood()) to pdf-id (which is used internally).
++     @param [in] am_nnet   The neural net that we're going to do the computation with;
++                         we also get the priors to divide by, if applicable, from here.
++     @param [in] feats   A pointer to the input feature matrix; must be non-NULL.
++                         We
++     @param [in] ivector If you are using iVectors estimated in batch mode,
++                         a pointer to the iVector, else NULL.
++     @param [in] ivector If you are using iVectors estimated in batch mode,
++                         a pointer to the iVector, else NULL.
++     @param [in] online_ivectors
++                        If you are using iVectors estimated 'online'
++                        a pointer to the iVectors, else NULL.
++     @param [in] online_ivector_period If you are using iVectors estimated 'online'
++                        (i.e. if online_ivectors != NULL) gives the periodicity
++                        (in frames) with which the iVectors are estimated.
++     @param [in,out] compiler  A pointer to a compiler [optional]-- the user
++                        can declare one in the calling code and repeatedly
++                        supply pointers to it, which allows for caching of computations
++                        across consecutive decodes.  You'd want to have initialized
++                        the compiler object with as
++                        compiler(am_nnet.GetNnet(), opts.optimize_config).
++  */
++  DecodableAmMaceSimple(const MaceSimpleComputationOptions &opts,
++                        const TransitionModel &trans_model,
++                        MaceComputer *computer,
++                        const VectorBase<BaseFloat> &priors,
++                        const MatrixBase<BaseFloat> &feats,
++                        const VectorBase<BaseFloat> *ivector = NULL,
++                        const MatrixBase<BaseFloat> *online_ivectors = NULL,
++                        int32 online_ivector_period = 1);
++
++
++  virtual BaseFloat LogLikelihood(int32 frame, int32 transition_id);
++
++  virtual inline int32 NumFramesReady() const {
++    return decodable_nnet_.NumFrames();
++  }
++
++  virtual int32 NumIndices() const { return trans_model_.NumTransitionIds(); }
++
++  virtual bool IsLastFrame(int32 frame) const {
++    KALDI_ASSERT(frame < NumFramesReady());
++    return (frame == NumFramesReady() - 1);
++  }
++
++ private:
++  KALDI_DISALLOW_COPY_AND_ASSIGN(DecodableAmMaceSimple);
++  // This compiler object is only used if the 'compiler'
++  // argument to the constructor is NULL.
++  DecodableMaceSimple decodable_nnet_;
++  const TransitionModel &trans_model_;
++};
++
++
++
++} // namespace MACE
++} // namespace kaldi
++
++#endif  // KALDI_MACE_MACE_AM_DECODABLE_SIMPLE_H_
+diff --git a/src/mace/mace-computer.cc b/src/mace/mace-computer.cc
+new file mode 100644
+index 0000000..63dcf41
+--- /dev/null
++++ b/src/mace/mace-computer.cc
+@@ -0,0 +1,348 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include <fcntl.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++#include <numeric>
++
++#include "mace-computer.h"
++
++namespace kaldi {
++namespace MACE {
++
++void SplitString(const std::string& s,
++                 std::vector<std::string>& v,
++                 const std::string& c)
++{
++  std::string::size_type pos1, pos2;
++  pos2 = s.find(c);
++  pos1 = 0;
++  while(std::string::npos != pos2)
++  {
++    v.push_back(s.substr(pos1, pos2-pos1));
++
++    pos1 = pos2 + c.size();
++    pos2 = s.find(c, pos1);
++  }
++  if(pos1 != s.length())
++    v.push_back(s.substr(pos1));
++}
++
++void String2Ints(const std::string &s,
++                 std::vector<int64> &ints,
++                 const std::string &c) {
++  std::vector<std::string> ints_vec;
++  SplitString(s, ints_vec, c);
++  for(auto &v: ints_vec) {
++    ints.push_back(std::stoi(v));
++  }
++}
++
++void DeletaSpaces(std::string str) {
++  str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
++}
++
++void MaceModelInfo::ExtractInfo() {
++  SplitString(input_names_str, input_names_, ",");
++  SplitString(output_names_str, output_names_, ",");
++  KALDI_ASSERT(!input_names_.empty() || !output_names_.empty());
++
++  if (!cache_names_str.empty()) {
++    SplitString(cache_names_str, cache_names_, ",");
++  }
++  std::vector<std::string> input_shapes_s;
++  SplitString(input_shapes_str, input_shapes_s, ";");
++  input_shapes_.resize(input_shapes_s.size());
++  for (int i = 0; i < input_shapes_s.size(); ++i) {
++    String2Ints(input_shapes_s[i], input_shapes_[i], ",");
++  }
++  KALDI_ASSERT(!input_names_.empty() && input_shapes_.size() == input_names_.size());
++  std::vector<std::string> output_shapes_s;
++  SplitString(output_shapes_str, output_shapes_s, ";");
++  output_shapes_.resize(output_shapes_s.size());
++  for (int i = 0; i < output_shapes_s.size(); ++i) {
++    String2Ints(output_shapes_s[i], output_shapes_[i], ",");
++  }
++  KALDI_ASSERT(!output_names_.empty() && output_shapes_.size() == output_names_.size());
++  if (!cache_names_.empty()) {
++    std::vector<std::string> cache_shapes_s;
++    SplitString(cache_shapes_str, cache_shapes_s, ";");
++    cache_shapes_.resize(cache_shapes_s.size());
++    for (int i = 0; i < cache_shapes_s.size(); ++i) {
++      String2Ints(cache_shapes_s[i], cache_shapes_[i], ",");
++    }
++    KALDI_ASSERT(!cache_names_.empty() && cache_shapes_.size() == cache_names_.size());
++  }
++
++  if (output.empty()) {
++    output = output_names_[0];
++  }
++
++  UpdateDim();
++}
++
++void MaceModelInfo::UpdateDim() {
++  if (input_names_.size() > 1) {
++    if (input_names_[1] == "ivector")
++      has_ivector_ = true;
++  } else {
++    has_ivector_ = false;
++    ivector_dim_ = -1;
++    num_ivectors_ = 0;
++  }
++  size_t rank = input_shapes_[0].size();
++  input_dim_ = static_cast<int32>(input_shapes_[0][rank -1]);
++  if (has_ivector_) {
++    rank = input_shapes_[1].size();
++    ivector_dim_ = static_cast<int32>(input_shapes_[1][rank -1]);
++    num_ivectors_ = static_cast<int32>(input_shapes_[1][rank -2]);
++  }
++  rank = output_shapes_[0].size();
++  output_dim_ = static_cast<int32>(output_shapes_[0][rank -1]);
++}
++
++
++MaceComputer::MaceComputer(const std::string &model_file,
++                           const std::string &weight_file,
++                           const std::vector<std::string> &input_nodes,
++                           const std::vector<std::string> &output_nodes,
++                           const std::vector<std::string> &cache_nodes,
++                           const std::vector<std::vector<int64>> &input_shapes,
++                           const std::vector<std::vector<int64>> &output_shapes,
++                           const std::vector<std::vector<int64>> &cache_shapes):
++    modulus_(1),
++    left_context_(0),
++    right_context_(0),
++    has_ivector_(!cache_nodes.empty()),
++    input_names_(input_nodes),
++    output_names_(output_nodes),
++    cache_names_(cache_nodes),
++    input_shapes_(input_shapes),
++    output_shapes_(output_shapes),
++    cache_shapes_(cache_shapes) {
++  if (input_names_.size() > 1) {
++    if (input_names_[1] == "ivector")
++      has_ivector_ = true;
++  }
++  size_t rank = input_shapes_[0].size();
++  input_dim_ = static_cast<int32>(input_shapes_[1][rank -1]);
++  if (has_ivector_) {
++    rank = input_shapes_[1].size();
++    ivector_dim_ = static_cast<int32>(input_shapes_[1][rank -1]);
++    num_ivectors_ = static_cast<int32>(input_shapes_[1][rank -2]);
++  } else {
++    ivector_dim_ = -1;
++    num_ivectors_ = 0;
++  }
++  rank = output_shapes_[0].size();
++  output_dim_ = static_cast<int32>(output_shapes_[1][rank -1]);
++  InitEngine(model_file, weight_file);
++  InitTensors();
++}
++
++mace::MaceStatus MaceComputer::InitEngine(
++    const std::string &model_file,
++    const std::string &weight_file) {
++  int32 omp_num_threads = -1;
++  int32 cpu_affinity_policy = 1;
++  mace::MaceEngineConfig config(mace::DeviceType::CPU);
++  mace::MaceStatus status = config.SetCPUThreadPolicy(
++      omp_num_threads,
++      static_cast<mace::CPUAffinityPolicy>(cpu_affinity_policy));
++  if (status != mace::MaceStatus::MACE_SUCCESS) {
++    KALDI_ERR << "Set openmp or cpu affinity failed.";
++  }
++  KALDI_ASSERT(!model_file.empty());
++  KALDI_ASSERT(!weight_file.empty());
++  void *model_graph_data = nullptr;
++  size_t graph_data_len = 0;
++
++  int fd_graph = open(model_file.c_str(), O_RDONLY);
++  if (fd_graph >= 0) {
++    struct stat st;
++    int r = fstat(fd_graph, &st);
++    if (r < 0) {
++      KALDI_ERR << "Failed to stat file: " << model_file;
++    }
++    graph_data_len = static_cast<size_t >(st.st_size);
++    model_graph_data =
++        mmap(nullptr, graph_data_len, PROT_READ, MAP_PRIVATE, fd_graph, 0);
++    if (model_graph_data == MAP_FAILED) {
++      KALDI_ERR << "Failed to map model graph data in: " << model_file;
++    }
++    close(fd_graph);
++  } else {
++    KALDI_ERR << "Failed to open file: " << model_file;
++  }
++
++  int fd_weight = open(weight_file.c_str(), O_RDONLY);
++  if (fd_weight >= 0) {
++    struct stat st;
++    int r = fstat(fd_weight, &st);
++    if (r < 0) {
++      KALDI_ERR << "Failed to stat file: " << model_file;
++    }
++    weights_data_len_ = static_cast<size_t >(st.st_size);
++    model_weights_data_ =
++        mmap(nullptr, weights_data_len_, PROT_READ, MAP_PRIVATE, fd_weight, 0);
++
++    if (model_weights_data_ == MAP_FAILED) {
++      KALDI_ERR << "Failed to map weight data in: " << weight_file;
++    }
++    close(fd_weight);
++  } else {
++    KALDI_ERR << "Failed to open file: " << weight_file;
++  }
++
++  std::vector<std::string> outputs = output_names_;
++  std::vector<std::string> inputs = input_names_;
++  outputs.insert(outputs.end(), cache_names_.begin(), cache_names_.end());
++  for (auto &cache_name: cache_names_) {
++    inputs.push_back(cache_name + ".IfDefined");
++  }
++  mace::MaceStatus create_engine_status;
++  create_engine_status = mace::CreateMaceEngineFromProto(
++      reinterpret_cast<const unsigned char *>(model_graph_data),
++      graph_data_len,
++      reinterpret_cast<const unsigned char *>(model_weights_data_),
++      weights_data_len_,
++      inputs,
++      outputs,
++      config,
++      &engine_);
++  munmap(model_graph_data, graph_data_len);
++  if (create_engine_status != mace::MaceStatus::MACE_SUCCESS) {
++    KALDI_ERR << "Create engine error, please check the arguments first, "
++              << "if correct, the device may not run the model, "
++              << "please fall back to other strategy.";
++    exit(1);
++  }
++  return create_engine_status;
++}
++
++void MaceComputer::InitTensors() {
++  const size_t input_count = input_names_.size();
++  const size_t output_count = output_names_.size();
++  const size_t caches_count = cache_names_.size();
++  // Init input tensors
++  for (size_t i = 0; i < input_count; ++i) {
++    int64 input_size =
++        std::accumulate(input_shapes_[i].begin(), input_shapes_[i].end(), 1,
++                        std::multiplies<int64>());
++    auto buffer_in = std::shared_ptr<float>(new float[input_size],
++                                            std::default_delete<float[]>());
++    inputs_[input_names_[i]] = mace::MaceTensor(input_shapes_[i],
++                                               buffer_in,
++                                               mace::DataFormat::NONE);
++  }
++  for (size_t i = 0; i < output_count; ++i) {
++    int64 output_size =
++        std::accumulate(output_shapes_[i].begin(),
++                        output_shapes_[i].end(), 1,
++                        std::multiplies<int64>());
++    auto buffer_out = std::shared_ptr<float>(new float[output_size],
++                                             std::default_delete<float[]>());
++    outputs_[output_names_[i]] = mace::MaceTensor(output_shapes_[i],
++                                                 buffer_out,
++                                                 mace::DataFormat::NONE);
++  }
++  for (size_t i = 0; i < caches_count; ++i) {
++    int64 cache_size =
++        std::accumulate(cache_shapes_[i].begin(),
++                        cache_shapes_[i].end(),
++                        1,
++                        std::multiplies<int64>());
++    auto cache_buffer_out = std::shared_ptr<float>(new float[cache_size],
++                                                   std::default_delete<float[]>());
++    outputs_[cache_names_[i]] = mace::MaceTensor(cache_shapes_[i],
++                                                 cache_buffer_out,
++                                                 mace::DataFormat::NONE);
++    auto cache_buffer_in = std::shared_ptr<float>(new float[cache_size],
++                                                  std::default_delete<float[]>());
++
++    std::string cache_input_name = cache_names_[i] + ".IfDefined";
++    mace::MaceTensor cache_tensor(cache_shapes_[i],
++                                  cache_buffer_in,
++                                  mace::DataFormat::NONE);
++    inputs_[cache_input_name] = cache_tensor;
++    std::memset(cache_tensor.data().get(), 0, cache_size * sizeof(float));
++  }
++}
++
++void MaceComputer::UpdateInput(const std::string &input_name,
++                               Matrix<BaseFloat> *input_feats_cu) {
++  auto iter = inputs_.find(input_name);
++  KALDI_ASSERT(iter != inputs_.end());
++  mace::MaceTensor tensor = inputs_[input_name];
++  int64 input_size = std::accumulate(tensor.shape().begin(), tensor.shape().end(), 1,
++                                     std::multiplies<int64_t>());
++  std::copy_n(input_feats_cu->Data(), input_size, tensor.data().get());
++}
++
++
++void MaceComputer::AcceptIvector(Matrix<BaseFloat> *ivector_feats) {
++  this->UpdateInput("ivector", ivector_feats);
++}
++
++void MaceComputer::AcceptInput(Matrix<BaseFloat> *input_feats) {
++  this->UpdateInput("input", input_feats);
++}
++
++void MaceComputer::GetOutputWithName(const std::string &name,
++                                     Matrix<BaseFloat> *output_mat) {
++  auto iter = outputs_.find(name);
++  KALDI_ASSERT(iter != outputs_.end());
++  mace::MaceTensor tensor = outputs_[name];
++  const std::vector<int64> &output_shape = tensor.shape();
++  const int64 rows = std::accumulate(output_shape.begin(),
++                               output_shape.end() - 1, 1,
++                               std::multiplies<int32>());
++  output_mat->Resize(rows, output_dim_);
++  int64 output_size = rows * output_dim_;
++  std::copy_n(tensor.data().get(), output_size, output_mat->Data());
++}
++
++void MaceComputer::GetOutputWithIndex(int32 index,
++                                      Matrix<BaseFloat> *output_mat) {
++  KALDI_ASSERT(index < output_names_.size());
++  std::string name = output_names_[index];
++  GetOutputWithName(name, output_mat);
++}
++
++void MaceComputer::GetOutput(Matrix<BaseFloat> *output_mat) {
++  this->GetOutputWithName(output_name_, output_mat);
++}
++
++void MaceComputer::UpdateCacheTensors() {
++  if (cache_names_.empty()) return;
++  for (const auto &cache_name : cache_names_) {
++    auto iter = outputs_.find(cache_name);
++    KALDI_ASSERT(iter != outputs_.end());
++    mace::MaceTensor cache_out_tensor = outputs_[cache_name];
++    iter = inputs_.find(cache_name + ".IfDefined");
++    KALDI_ASSERT(iter != inputs_.end());
++    mace::MaceTensor cache_in_tensor = inputs_[cache_name + ".IfDefined"];
++    const std::vector<int64> &cache_shape = cache_out_tensor.shape();
++    int64 output_size = std::accumulate(cache_shape.begin(),
++                                 cache_shape.end(), 1,
++                                 std::multiplies<int64>());
++    std::copy_n(cache_out_tensor.data().get(), output_size, cache_in_tensor.data().get());
++  }
++}
++
++} // namespace MACE
++} // namespace kaldi
++#endif
+diff --git a/src/mace/mace-computer.h b/src/mace/mace-computer.h
+new file mode 100644
+index 0000000..98ebb6b
+--- /dev/null
++++ b/src/mace/mace-computer.h
+@@ -0,0 +1,197 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef KALDI_MACE_MACE_COMPUTER_H_
++#define KALDI_MACE_MACE_COMPUTER_H_
++
++#include <vector>
++#include <sys/mman.h>
++
++#include "itf/options-itf.h"
++#include "matrix/matrix-lib.h"
++#include "mace/public/mace.h"
++
++namespace kaldi {
++namespace MACE {
++
++class MaceModelInfo {
++ public:
++  std::string input_names_str;
++  std::string output_names_str;
++  std::string cache_names_str;
++  std::string input_shapes_str;
++  std::string output_shapes_str;
++  std::string cache_shapes_str;
++  std::string output;
++
++  int32 left_context;
++  int32 right_context;
++  int32 modulus;
++
++  std::string model_file;
++  std::string weight_file;
++  std::string trans_model;
++  std::string priors_file;
++
++  std::vector<std::string> input_names_;
++  std::vector<std::string> output_names_;
++  std::vector<std::string> cache_names_;
++  std::vector<std::vector<int64>> input_shapes_;
++  std::vector<std::vector<int64>> output_shapes_;
++  std::vector<std::vector<int64>> cache_shapes_;
++
++  int32 input_dim_;
++  int32 ivector_dim_;
++  int32 output_dim_;
++  int32 num_ivectors_;
++  bool has_ivector_;
++
++  MaceModelInfo():
++      input_names_str(""),
++      output_names_str(""),
++      cache_names_str(""),
++      input_shapes_str(""),
++      output_shapes_str(""),
++      cache_shapes_str(""),
++      output(""),
++      left_context(0),
++      right_context(0),
++      modulus(1),
++      model_file(""),
++      weight_file(""),
++      trans_model(""),
++      priors_file("") {}
++
++  void Register(OptionsItf *opts) {
++    opts->Register("output", &output,
++                   "the output node name which will be used as the nnet's output.");
++    opts->Register("input-nodes", &input_names_str,
++                   "the input node name of the nnet, default is 'input'.");
++    opts->Register("input-shapes", &input_shapes_str,
++                   "the shapes of input nodes.");
++    opts->Register("output-nodes", &output_names_str,
++                   "the output node name of nnet, default is 'output'.");
++    opts->Register("output-shapes", &output_shapes_str,
++                   "the shapes of output nodes.");
++    opts->Register("cache-nodes", &cache_names_str,
++                   "the cache node name of the nnet, if there are Ifdefined inputs.");
++    opts->Register("cache-shapes", &cache_shapes_str,
++                   "the shapes of cache nodes.");
++    opts->Register("modulus", &modulus,
++                   "Modulus of the nnet model.");
++    opts->Register("model-file", &model_file, "Model graph file path.");
++    opts->Register("weight-file", &weight_file, "Model data file path.");
++    opts->Register("trans-model", &trans_model, "Transition model file path.");
++    opts->Register("priors-file", &priors_file, "Priors file path.");
++  }
++
++  void ExtractInfo();
++  void UpdateDim();
++};
++
++
++class MaceComputer {
++ public:
++  MaceComputer(MaceModelInfo info):
++      modulus_(info.modulus),
++      left_context_(info.left_context),
++      right_context_(info.right_context),
++      has_ivector_(info.has_ivector_),
++      input_names_(info.input_names_),
++      output_names_(info.output_names_),
++      cache_names_(info.cache_names_),
++      input_shapes_(info.input_shapes_),
++      output_shapes_(info.output_shapes_),
++      cache_shapes_(info.cache_shapes_),
++      output_name_(info.output) {
++
++    has_ivector_ = info.has_ivector_;
++    num_ivectors_ = info.num_ivectors_;
++    ivector_dim_ = info.ivector_dim_;
++    input_dim_ = info.input_dim_;
++    output_dim_ = info.output_dim_;
++
++    InitEngine(info.model_file, info.weight_file);
++    InitTensors();
++  };
++
++  MaceComputer(const std::string &model_file,
++               const std::string &weight_file,
++               const std::vector<std::string> &input_nodes,
++               const std::vector<std::string> &output_nodes,
++               const std::vector<std::string> &cache_nodes,
++               const std::vector<std::vector<int64>> &input_shapes,
++               const std::vector<std::vector<int64>> &output_shapes,
++               const std::vector<std::vector<int64>> &cache_shapes);
++
++  int32 OutputDim() const { return output_dim_; }
++  int32 InputDim() const { return input_dim_; }
++  int32 IvectorDim() const { return ivector_dim_; }
++  int32 NumIvectors() const { return num_ivectors_; }
++  int32 Modulus() const { return modulus_; }
++  int32 LeftContext() const { return left_context_; }
++  int32 RightContext() const { return right_context_; }
++
++  mace::MaceStatus InitEngine(const std::string &model_file,
++                              const std::string &weight_file);
++  void InitTensors();
++
++  void AcceptInput(Matrix<BaseFloat> *input_mat);
++  void AcceptIvector(Matrix<BaseFloat> *input_mat);
++  void UpdateInput(const std::string &name,
++                   Matrix<BaseFloat> *input_mat);
++  void UpdateCacheTensors();
++  void GetOutput(Matrix<BaseFloat> *output_mat);
++  void GetOutputWithName(const std::string &name,
++                         Matrix<BaseFloat> *output_mat);
++  void GetOutputWithIndex(int32 index,
++                          Matrix<BaseFloat> *output_mat);
++
++  mace::MaceStatus Run() {return engine_->Run(inputs_, &outputs_);};
++  mace::MaceStatus Run(mace::RunMetadata *run_metadata) {
++    return engine_->Run(inputs_, &outputs_, run_metadata);
++  };
++
++  ~MaceComputer(){
++    if (weights_data_len_ > 0)
++      munmap(model_weights_data_, weights_data_len_);
++  };
++
++ private:
++  int32 modulus_;
++  int32 left_context_;
++  int32 right_context_;
++  bool has_ivector_;
++  const std::vector<std::string> input_names_;
++  const std::vector<std::string> output_names_;
++  const std::vector<std::string> cache_names_;
++  const std::vector<std::vector<int64>> &input_shapes_;
++  const std::vector<std::vector<int64>> &output_shapes_;
++  const std::vector<std::vector<int64>> &cache_shapes_;
++  std::map<std::string, mace::MaceTensor> inputs_;
++  std::map<std::string, mace::MaceTensor> outputs_;
++  int32 input_dim_;
++  int32 ivector_dim_;
++  int32 output_dim_;
++  int32 num_ivectors_;
++  std::shared_ptr<mace::MaceEngine> engine_;
++  void *model_weights_data_;
++  size_t weights_data_len_;
++  std::string output_name_;
++};
++
++} // namespace MACE
++} // namespace kaldi
++
++#endif  // KALDI_MACE_MACE_COMPUTER_H_
+diff --git a/src/mace/mace-decodable-online-looped.cc b/src/mace/mace-decodable-online-looped.cc
+new file mode 100644
+index 0000000..450227f
+--- /dev/null
++++ b/src/mace/mace-decodable-online-looped.cc
+@@ -0,0 +1,201 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include "mace-decodable-online-looped.h"
++
++namespace kaldi {
++namespace MACE {
++
++MaceDecodableNnetLoopedOnlineBase::MaceDecodableNnetLoopedOnlineBase(
++    const MaceDecodableNnetSimpleLoopedInfo &info,
++    OnlineFeatureInterface *input_features,
++    OnlineFeatureInterface *ivector_features):
++    num_chunks_computed_(0),
++    current_log_post_subsampled_offset_(-1),
++    info_(info),
++    frame_offset_(0),
++    input_features_(input_features),
++    ivector_features_(ivector_features),
++    computer_(info_.computer) {   // NULL is 'nnet_to_update'
++  // Check that feature dimensions match.
++  KALDI_ASSERT(input_features_ != NULL);
++  int32 nnet_input_dim = info_.computer->InputDim(),
++      nnet_ivector_dim = info_.computer->IvectorDim(),
++        feat_input_dim = input_features_->Dim(),
++      feat_ivector_dim = (ivector_features_ != NULL ?
++                          ivector_features_->Dim() : -1);
++  if (info.has_ivectors) {
++    current_ivectors_ = Matrix<BaseFloat>(info.computer->NumIvectors(),
++                                          info.computer->IvectorDim());
++  }
++  if (nnet_input_dim != feat_input_dim) {
++    KALDI_ERR << "Input feature dimension mismatch: got " << feat_input_dim
++              << " but network expects " << nnet_input_dim;
++  }
++  if (nnet_ivector_dim != feat_ivector_dim) {
++    KALDI_ERR << "Ivector feature dimension mismatch: got " << feat_ivector_dim
++              << " but network expects " << nnet_ivector_dim;
++  }
++}
++
++int32 MaceDecodableNnetLoopedOnlineBase::NumFramesReady() const {
++  // note: the ivector_features_ may have 2 or 3 fewer frames ready than
++  // input_features_, but we don't wait for them; we just use the most recent
++  // iVector we can.
++  int32 features_ready = input_features_->NumFramesReady();
++  if (features_ready == 0)
++    return 0;
++  bool input_finished = input_features_->IsLastFrame(features_ready - 1);
++  int32 sf = info_.opts.frame_subsampling_factor;
++  if (input_finished) {
++    return (features_ready + sf - 1) / sf - frame_offset_;
++  } else {
++    int32 non_subsampled_output_frames_ready =
++        std::max<int32>(0, features_ready - info_.frames_right_context);
++    int32 num_chunks_ready = non_subsampled_output_frames_ready /
++                             info_.frames_per_chunk;
++    return num_chunks_ready * info_.frames_per_chunk / sf - frame_offset_;
++  }
++}
++
++// note: the frame-index argument is on the output of the network, i.e. after any
++// subsampling, so we call it 'subsampled_frame'.
++bool MaceDecodableNnetLoopedOnlineBase::IsLastFrame(
++    int32 subsampled_frame) const {
++  // To understand this code, compare it with the code of NumFramesReady(),
++  // it follows the same structure.
++  int32 features_ready = input_features_->NumFramesReady();
++  if (features_ready == 0) {
++    return (subsampled_frame == -1 && input_features_->IsLastFrame(-1));
++  }
++  bool input_finished = input_features_->IsLastFrame(features_ready - 1);
++  if (!input_finished)
++    return false;
++  int32 sf = info_.opts.frame_subsampling_factor,
++     num_subsampled_frames_ready = (features_ready + sf - 1) / sf;
++  return (subsampled_frame + frame_offset_ == num_subsampled_frames_ready - 1);
++}
++
++void MaceDecodableNnetLoopedOnlineBase::SetFrameOffset(int32 frame_offset) {
++  KALDI_ASSERT(0 <= frame_offset &&
++               frame_offset <= frame_offset_ + NumFramesReady());
++  frame_offset_ = frame_offset;
++}
++
++void MaceDecodableNnetLoopedOnlineBase::AdvanceChunk() {
++  Timer timer(true);
++  KALDI_ASSERT(num_chunks_computed_ >= 0);
++  int32 chunk_size = info_.frames_left_context + info_.frames_per_chunk
++      + info_.frames_right_context;
++  int32 begin_input_frame = num_chunks_computed_ * info_.frames_per_chunk
++      - info_.frames_left_context;
++  int32 end_input_frame = begin_input_frame + chunk_size;
++  int32 num_feature_frames_ready = input_features_->NumFramesReady();
++  bool is_finished = input_features_->IsLastFrame(num_feature_frames_ready - 1);
++
++  if (end_input_frame > num_feature_frames_ready) {
++    end_input_frame = num_feature_frames_ready;
++  }
++
++  if (end_input_frame > num_feature_frames_ready && !is_finished) {
++    KALDI_ERR << "Attempt to access frame past the end of the available input";
++  }
++
++  // Prepare Input
++  Matrix<BaseFloat> feats_chunk(chunk_size, input_features_->Dim());
++  for (int32 i = 0; i < chunk_size; i++) {
++    SubVector<BaseFloat> this_row(feats_chunk, i);
++    int32 input_frame = i + begin_input_frame;
++    if (input_frame < 0) input_frame = 0;
++    if (input_frame >= num_feature_frames_ready)
++      input_frame = num_feature_frames_ready - 1;
++    input_features_->GetFrame(input_frame, &this_row);
++  }
++  computer_->AcceptInput(&feats_chunk);
++
++  // Prepare Ivector
++  if (info_.has_ivectors) {
++    KALDI_ASSERT(ivector_features_ != NULL);
++    Vector<BaseFloat> ivector(ivector_features_->Dim());
++    int32 most_recent_input_frame = num_feature_frames_ready - 1,
++      num_ivector_frames_ready = ivector_features_->NumFramesReady();
++    if (num_ivector_frames_ready > 0) {
++      int32 ivector_frame_to_use = std::min<int32>(most_recent_input_frame,
++                                                   num_ivector_frames_ready - 1);
++      KALDI_VLOG(2) << "ivector frame to use:" << ivector_frame_to_use;
++      ivector_features_->GetFrame(ivector_frame_to_use, &ivector);
++    }
++    if (num_chunks_computed_ == 0) {
++      current_ivectors_.CopyRowsFromVec(ivector);
++    } else {
++      for (int i = 0; i < current_ivectors_.NumRows() - 1; ++i) {
++        current_ivectors_.CopyRowFromVec(current_ivectors_.Row(i + 1), i);
++      }
++      current_ivectors_.CopyRowFromVec(ivector, current_ivectors_.NumRows() -1);
++    }
++
++    KALDI_VLOG(2) << "Accept ivector:";
++    computer_->AcceptIvector(&current_ivectors_);
++  }
++  KALDI_VLOG(2) << "update cache tensors:";
++  if (num_chunks_computed_ > 0) computer_->UpdateCacheTensors();
++  KALDI_VLOG(2) << "engine run,.";
++  computer_->Run();
++  // Get Output
++  {
++    KALDI_VLOG(2) << "Get output chunk:" << num_chunks_computed_ + 1;
++    Matrix<BaseFloat> output;
++    computer_->GetOutput(&output);
++    if (info_.log_priors.Dim() != 0) {
++      // subtract log-prior (divide by prior)
++      output.AddVecToRows(-1.0, info_.log_priors);
++    }
++    // apply the acoustic scale
++    output.Scale(info_.opts.acoustic_scale);
++    current_log_post_.Resize(0, 0);
++    current_log_post_.Swap(&output);
++  }
++  KALDI_ASSERT(current_log_post_.NumRows() == info_.frames_per_chunk /
++               info_.opts.frame_subsampling_factor &&
++               current_log_post_.NumCols() == info_.output_dim);
++  num_chunks_computed_++;
++  current_log_post_subsampled_offset_ =
++      (num_chunks_computed_ - 1) *
++      (info_.frames_per_chunk / info_.opts.frame_subsampling_factor);
++  KALDI_VLOG(2) << "time for chunk-" << num_chunks_computed_ << " : " << timer.Elapsed();
++}
++
++BaseFloat MaceDecodableNnetLoopedOnline::LogLikelihood(int32 subsampled_frame,
++                                                       int32 index) {
++  subsampled_frame += frame_offset_;
++  EnsureFrameIsComputed(subsampled_frame);
++  return current_log_post_(
++      subsampled_frame - current_log_post_subsampled_offset_,
++      index - 1);
++}
++
++BaseFloat MaceDecodableAmNnetLoopedOnline::LogLikelihood(int32 subsampled_frame,
++                                                         int32 index) {
++  subsampled_frame += frame_offset_;
++  EnsureFrameIsComputed(subsampled_frame);
++  return current_log_post_(
++      subsampled_frame - current_log_post_subsampled_offset_,
++      trans_model_.TransitionIdToPdfFast(index));
++}
++
++
++} // namespace MACE
++} // namespace kaldi
++#endif
+diff --git a/src/mace/mace-decodable-online-looped.h b/src/mace/mace-decodable-online-looped.h
+new file mode 100644
+index 0000000..403d837
+--- /dev/null
++++ b/src/mace/mace-decodable-online-looped.h
+@@ -0,0 +1,203 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef KALDI_MACE_MACE_DECODABLE_ONLINE_LOOPED_H_
++#define KALDI_MACE_MACE_DECODABLE_ONLINE_LOOPED_H_
++
++#include "itf/online-feature-itf.h"
++#include "itf/decodable-itf.h"
++#include "hmm/transition-model.h"
++
++#include "mace-decodable-simple-looped.h"
++
++namespace kaldi {
++namespace MACE {
++
++
++// The Decodable objects that we define in this header do the neural net
++// computation in a way that's compatible with online feature extraction.  It
++// differs from the one declared in online-nnet3-decodable-simple.h because it
++// uses the 'looped' network evaluation, which is more efficient because it
++// re-uses hidden activations (and therefore doesn't have to pad chunks of data
++// with extra left-context); it is applicable to TDNNs and to forwards-recurrent
++// topologies like LSTMs, but not tobackwards-recurrent topologies such as
++// BLSTMs.
++
++// The options are passed in the same way as in decodable-simple-looped.h,
++// we use the same options and info class.
++
++
++// This object is used as a base class for DecodableNnetLoopedOnline
++// and DecodableAmNnetLoopedOnline.
++// It takes care of the neural net computation and computations related to how
++// many frames are ready (etc.), but it does not override the LogLikelihood() or
++// NumIndices() functions so it is not usable as an object of type
++// DecodableInterface.
++class MaceDecodableNnetLoopedOnlineBase: public DecodableInterface {
++ public:
++  // Constructor.  'input_feature' is for the feature that will be given
++  // as 'input' to the neural network; 'ivector_feature' is for the iVector
++  // feature, or NULL if iVectors are not being used.
++  MaceDecodableNnetLoopedOnlineBase(const MaceDecodableNnetSimpleLoopedInfo &info,
++                                    OnlineFeatureInterface *input_features,
++                                    OnlineFeatureInterface *ivector_features);
++
++  // note: the LogLikelihood function is not overridden; the child
++  // class needs to do this.
++  //virtual BaseFloat LogLikelihood(int32 subsampled_frame, int32 index);
++
++  // note: the frame argument is on the output of the network, i.e. after any
++  // subsampling, so we call it 'subsampled_frame'.
++  virtual bool IsLastFrame(int32 subsampled_frame) const;
++
++  virtual int32 NumFramesReady() const;
++
++  // Note: this function, present in the base-class, is overridden by the child class.
++  // virtual int32 NumIndices() const;
++
++  // this is not part of the standard Decodable interface but I think is needed for
++  // something.
++  int32 FrameSubsamplingFactor() const {
++    return info_.opts.frame_subsampling_factor;
++  }
++
++  /// Sets the frame offset value. Frame offset is initialized to 0 when the
++  /// decodable object is constructed and stays as 0 unless this method is
++  /// called. This method is useful when we want to reset the decoder state,
++  /// i.e. call decoder.InitDecoding(), but we want to keep using the same
++  /// decodable object, e.g. in case of an endpoint. The frame offset affects
++  /// the behavior of IsLastFrame(), NumFramesReady() and LogLikelihood()
++  /// methods.
++  void SetFrameOffset(int32 frame_offset);
++
++  /// Returns the frame offset value.
++  int32 GetFrameOffset() const { return frame_offset_; }
++
++ protected:
++
++  /// If the neural-network outputs for this frame are not cached, this function
++  /// computes them (and possibly also some later frames).  Note:
++  /// the frame-index is called 'subsampled_frame' because if frame-subsampling-factor
++  /// is not 1, it's an index that is "after subsampling", i.e. it changes more
++  /// slowly than the input-feature index.
++  inline void EnsureFrameIsComputed(int32 subsampled_frame) {
++    KALDI_ASSERT(subsampled_frame >= current_log_post_subsampled_offset_ &&
++                 "Frames must be accessed in order.");
++    while (subsampled_frame >= current_log_post_subsampled_offset_ +
++           current_log_post_.NumRows())
++      AdvanceChunk();
++  }
++
++  // The current log-posteriors that we got from the last time we
++  // ran the computation.
++  Matrix<BaseFloat> current_log_post_;
++  Matrix<BaseFloat> current_ivectors_;
++
++  // The number of chunks we have computed so far.
++  int32 num_chunks_computed_;
++
++  // The time-offset of the current log-posteriors, equals
++  // (num_chunks_computed_ - 1) *
++  //    (info_.frames_per_chunk_ / info_.opts_.frame_subsampling_factor).
++  int32 current_log_post_subsampled_offset_;
++
++  const MaceDecodableNnetSimpleLoopedInfo &info_;
++
++  // IsLastFrame(), NumFramesReady() and LogLikelihood() methods take into
++  // account this offset value. We initialize frame_offset_ as 0 and it stays as
++  // 0 unless SetFrameOffset() method is called.
++  int32 frame_offset_;
++
++ private:
++
++  // This function does the computation for the next chunk.  It will change
++  // current_log_post_ and current_log_post_subsampled_offset_, and
++  // increment num_chunks_computed_.
++  void AdvanceChunk();
++
++  OnlineFeatureInterface *input_features_;
++  OnlineFeatureInterface *ivector_features_;
++
++  MaceComputer *computer_;
++
++  KALDI_DISALLOW_COPY_AND_ASSIGN(MaceDecodableNnetLoopedOnlineBase);
++};
++
++// This decodable object takes indexes of the form (pdf_id + 1),
++// or whatever the output-dimension of the neural network represents,
++// plus one.
++// It fully implements DecodableInterface.
++// Note: whether or not division by the prior takes place depends on
++// whether you supplied class AmNnetSimple (or just Nnet), to the constructor
++// of the DecodableNnetSimpleLoopedInfo that you initailized this
++// with.
++class MaceDecodableNnetLoopedOnline: public MaceDecodableNnetLoopedOnlineBase {
++ public:
++  MaceDecodableNnetLoopedOnline(
++      const MaceDecodableNnetSimpleLoopedInfo &info,
++      OnlineFeatureInterface *input_features,
++      OnlineFeatureInterface *ivector_features):
++      MaceDecodableNnetLoopedOnlineBase(info, input_features, ivector_features) { }
++
++  // returns the output-dim of the neural net.
++  virtual int32 NumIndices() const { return info_.output_dim; }
++
++  // 'subsampled_frame' is a frame, but if frame-subsampling-factor != 1, it's a
++  // reduced-rate output frame (e.g. a 't' index divided by 3).  'index'
++  // represents the pdf-id (or other output of the network) PLUS ONE.
++  virtual BaseFloat LogLikelihood(int32 subsampled_frame, int32 index);
++
++ private:
++  KALDI_DISALLOW_COPY_AND_ASSIGN(MaceDecodableNnetLoopedOnline);
++
++};
++
++
++// This is for traditional decoding where the graph has transition-ids
++// on the arcs, and you need the TransitionModel to map those to
++// pdf-ids.
++// Note: whether or not division by the prior takes place depends on
++// whether you supplied class AmNnetSimple (or just Nnet), to the constructor
++// of the DecodableNnetSimpleLoopedInfo that you initailized this
++// with.
++class MaceDecodableAmNnetLoopedOnline: public MaceDecodableNnetLoopedOnlineBase {
++ public:
++  MaceDecodableAmNnetLoopedOnline(
++      const TransitionModel &trans_model,
++      const MaceDecodableNnetSimpleLoopedInfo &info,
++      OnlineFeatureInterface *input_features,
++      OnlineFeatureInterface *ivector_features):
++      MaceDecodableNnetLoopedOnlineBase(info, input_features, ivector_features),
++      trans_model_(trans_model) { }
++
++  // returns the output-dim of the neural net.
++  virtual int32 NumIndices() const { return trans_model_.NumTransitionIds(); }
++
++  // 'subsampled_frame' is a frame, but if frame-subsampling-factor != 1, it's a
++  // reduced-rate output frame (e.g. a 't' index divided by 3).
++  virtual BaseFloat LogLikelihood(int32 subsampled_frame,
++                                  int32 transition_id);
++
++ private:
++  const TransitionModel &trans_model_;
++
++  KALDI_DISALLOW_COPY_AND_ASSIGN(MaceDecodableAmNnetLoopedOnline);
++
++};
++
++
++} // namespace MACE
++} // namespace kaldi
++
++#endif // KALDI_MACE_MACE_DECODABLE_ONLINE_LOOPED_H_
+diff --git a/src/mace/mace-decodable-simple-looped.cc b/src/mace/mace-decodable-simple-looped.cc
+new file mode 100644
+index 0000000..b634625
+--- /dev/null
++++ b/src/mace/mace-decodable-simple-looped.cc
+@@ -0,0 +1,237 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include "mace-decodable-simple-looped.h"
++
++#include <fcntl.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++
++namespace kaldi {
++namespace MACE {
++
++
++MaceDecodableNnetSimpleLoopedInfo::MaceDecodableNnetSimpleLoopedInfo(
++    const MaceComputationOptions &opts,
++    MaceComputer *computer):
++    opts(opts), computer(computer) {
++  Init(opts, computer);
++}
++
++MaceDecodableNnetSimpleLoopedInfo::MaceDecodableNnetSimpleLoopedInfo(
++    const MaceComputationOptions &opts,
++    const Vector<BaseFloat> &priors,
++    MaceComputer *computer):
++    opts(opts), computer(computer), log_priors(priors) {
++  if (log_priors.Dim() != 0)
++    log_priors.ApplyLog();
++  Init(opts, computer);
++}
++
++
++int32 GetChunkSize(const int32 modulus,
++                   int32 frame_subsampling_factor,
++                   int32 advised_chunk_size) {
++  KALDI_ASSERT(modulus > 0 && frame_subsampling_factor > 0 &&
++      advised_chunk_size > 0);
++  int32 chunk_size = advised_chunk_size;
++  while (1) {
++    if (chunk_size % modulus == 0 &&
++        chunk_size % frame_subsampling_factor == 0)
++      return chunk_size;
++    chunk_size++;
++  }
++}
++
++
++void MaceDecodableNnetSimpleLoopedInfo::Init(
++    const MaceComputationOptions &opts,
++    MaceComputer *computer) {
++  opts.Check();
++  has_ivectors = (computer->IvectorDim() > 0);
++  int32 left_context = opts.left_context, right_context = opts.right_context;
++  int32 extra_right_context = 0;
++  frames_left_context = left_context + opts.extra_left_context_initial;
++  frames_right_context = right_context + extra_right_context;
++  frames_per_chunk = GetChunkSize(opts.modulus, opts.frame_subsampling_factor,
++                                  opts.frames_per_chunk);
++  output_dim = computer->OutputDim();
++  KALDI_ASSERT(output_dim > 0);
++  num_ivectors = computer->NumIvectors();
++}
++
++
++MaceDecodableNnetSimpleLooped::MaceDecodableNnetSimpleLooped(
++    const MaceDecodableNnetSimpleLoopedInfo &info,
++    MaceComputer *computer,
++    const MatrixBase<BaseFloat> &feats,
++    const VectorBase<BaseFloat> *ivector,
++    const MatrixBase<BaseFloat> *online_ivectors,
++    int32 online_ivector_period):
++    info_(info),
++    computer_(computer),
++    feats_(feats),
++    ivector_(ivector),
++    online_ivector_feats_(online_ivectors),
++    online_ivector_period_(online_ivector_period),
++    num_chunks_computed_(0),
++    current_log_post_subsampled_offset_(-1) {
++  num_subsampled_frames_ =
++      (feats_.NumRows() + info_.opts.frame_subsampling_factor - 1) /
++      info_.opts.frame_subsampling_factor;
++  KALDI_ASSERT(!(ivector != NULL && online_ivectors != NULL));
++  KALDI_ASSERT(!(online_ivectors != NULL && online_ivector_period <= 0 &&
++                 "You need to set the --online-ivector-period option!"));
++}
++
++
++void MaceDecodableNnetSimpleLooped::GetOutputForFrame(
++    int32 subsampled_frame, VectorBase<BaseFloat> *output) {
++    KALDI_ASSERT(subsampled_frame >= current_log_post_subsampled_offset_ &&
++                 "Frames must be accessed in order.");
++    while (subsampled_frame >= current_log_post_subsampled_offset_ +
++                            current_log_post_.NumRows())
++      AdvanceChunk();
++    output->CopyFromVec(current_log_post_.Row(
++        subsampled_frame - current_log_post_subsampled_offset_));
++}
++
++int32 MaceDecodableNnetSimpleLooped::GetIvectorDim() const {
++  return computer_->IvectorDim();
++}
++
++
++void MaceDecodableNnetSimpleLooped::AdvanceChunk() {
++  int32 begin_input_frame, end_input_frame;
++  int32 chunk_size = info_.frames_left_context +
++      info_.frames_per_chunk + info_.frames_right_context;
++  begin_input_frame = chunk_size - info_.frames_left_context;
++  end_input_frame = begin_input_frame + chunk_size;
++
++  Matrix<BaseFloat> feats_chunk(end_input_frame - begin_input_frame,
++                                  feats_.NumCols(), kUndefined);
++
++  int32 num_features = feats_.NumRows();
++  if (begin_input_frame >= 0 && end_input_frame <= num_features) {
++    SubMatrix<BaseFloat> this_feats(feats_,
++                                    begin_input_frame,
++                                    end_input_frame - begin_input_frame,
++                                    0, feats_.NumCols());
++    feats_chunk.CopyFromMat(this_feats);
++  } else {
++    Matrix<BaseFloat> this_feats(end_input_frame - begin_input_frame,
++                                 feats_.NumCols());
++    for (int32 r = begin_input_frame; r < end_input_frame; r++) {
++      int32 input_frame = r;
++      if (input_frame < 0) input_frame = 0;
++      if (input_frame >= num_features) input_frame = num_features - 1;
++      this_feats.Row(r - begin_input_frame).CopyFromVec(
++          feats_.Row(input_frame));
++    }
++    feats_chunk.CopyFromMat(this_feats);
++  }
++  computer_->AcceptInput(&feats_chunk);
++
++  if (num_chunks_computed_ > 0) computer_->UpdateCacheTensors();
++
++  if (info_.has_ivectors) {
++    // all but the 1st chunk should have 1 iVector, but no need
++    // to assume this.
++    KALDI_ASSERT(info_.num_ivectors > 0);
++
++    Vector<BaseFloat> ivector;
++    // we just get the iVector from the last input frame we needed...
++    // we don't bother trying to be 'accurate' in getting the iVectors
++    // for their 'correct' frames, because in general using the
++    // iVector from as large 't' as possible will be better.
++    GetCurrentIvector(end_input_frame, &ivector);
++    Matrix<BaseFloat> ivectors(info_.num_ivectors,
++                               ivector.Dim());
++    ivectors.CopyRowsFromVec(ivector);
++    computer_->AcceptIvector(&ivectors);
++  }
++  computer_->Run();
++  {
++    // Note: it's possible in theory that if you had weird recurrence that went
++    // directly from the output, the call to GetOutputDestructive() would cause
++    // a crash on the next chunk.  If that happens, GetOutput() should be used
++    // instead of GetOutputDestructive().  But we don't anticipate this will
++    // happen in practice.
++    Matrix<BaseFloat> output;
++    computer_->GetOutput(&output);
++
++    if (info_.log_priors.Dim() != 0) {
++      // subtract log-prior (divide by prior)
++      output.AddVecToRows(-1.0, info_.log_priors);
++    }
++    // apply the acoustic scale
++    output.Scale(info_.opts.acoustic_scale);
++    current_log_post_.Resize(0, 0);
++    current_log_post_.Swap(&output);
++  }
++  KALDI_ASSERT(current_log_post_.NumRows() == info_.frames_per_chunk /
++               info_.opts.frame_subsampling_factor &&
++               current_log_post_.NumCols() == info_.output_dim);
++
++  num_chunks_computed_++;
++
++  current_log_post_subsampled_offset_ =
++      (num_chunks_computed_ - 1) *
++      (info_.frames_per_chunk / info_.opts.frame_subsampling_factor);
++}
++
++
++void MaceDecodableNnetSimpleLooped::GetCurrentIvector(int32 input_frame,
++                                                      Vector<BaseFloat> *ivector) {
++  if (!info_.has_ivectors)
++    return;
++  if (ivector_ != NULL) {
++    *ivector = *ivector_;
++    return;
++  } else if (online_ivector_feats_ == NULL) {
++    KALDI_ERR << "Neural net expects iVectors but none provided.";
++  }
++  KALDI_ASSERT(online_ivector_period_ > 0);
++  int32 ivector_frame = input_frame / online_ivector_period_;
++  KALDI_ASSERT(ivector_frame >= 0);
++  if (ivector_frame >= online_ivector_feats_->NumRows())
++    ivector_frame = online_ivector_feats_->NumRows() - 1;
++  KALDI_ASSERT(ivector_frame >= 0 && "ivector matrix cannot be empty.");
++  *ivector = online_ivector_feats_->Row(ivector_frame);
++}
++
++
++MaceDecodableAmNnetSimpleLooped::MaceDecodableAmNnetSimpleLooped(
++    const MaceDecodableNnetSimpleLoopedInfo &info,
++    const TransitionModel &trans_model,
++    MaceComputer *computer,
++    const MatrixBase<BaseFloat> &feats,
++    const VectorBase<BaseFloat> *ivector,
++    const MatrixBase<BaseFloat> *online_ivectors,
++    int32 online_ivector_period):
++    decodable_nnet_(info, computer, feats, ivector, online_ivectors, online_ivector_period),
++    trans_model_(trans_model) { }
++
++BaseFloat MaceDecodableAmNnetSimpleLooped::LogLikelihood(int32 frame,
++                                                     int32 transition_id) {
++  int32 pdf_id = trans_model_.TransitionIdToPdfFast(transition_id);
++  return decodable_nnet_.GetOutput(frame, pdf_id);
++}
++
++
++
++} // namespace MACE
++} // namespace kaldi
++#endif
+diff --git a/src/mace/mace-decodable-simple-looped.h b/src/mace/mace-decodable-simple-looped.h
+new file mode 100644
+index 0000000..3700f35
+--- /dev/null
++++ b/src/mace/mace-decodable-simple-looped.h
+@@ -0,0 +1,303 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef KALDI_MACE_MACE_DECODABLE_SIMPLE_LOOPED_H_
++#define KALDI_MACE_MACE_DECODABLE_SIMPLE_LOOPED_H_
++
++#include <vector>
++#include "base/kaldi-common.h"
++#include "util/kaldi-io.h"
++#include "matrix/matrix-lib.h"
++#include "hmm/transition-model.h"
++#include "itf/decodable-itf.h"
++#include "mace-computer.h"
++
++namespace kaldi {
++namespace MACE {
++
++
++// Note: the 'simple' in the name means it applies to networks for which
++// IsSimpleNnet(nnet) would return true.  'looped' means we use looped
++// computations, with a kGotoLabel statement at the end of it.
++struct MaceComputationOptions {
++  int32 left_context;
++  int32 right_context;
++  int32 modulus;
++  int32 extra_left_context_initial;
++  int32 frame_subsampling_factor;
++  int32 frames_per_chunk;
++  BaseFloat acoustic_scale;
++  bool debug_computation;
++  MaceComputationOptions():
++      left_context(0),
++      right_context(0),
++      modulus(1),
++      extra_left_context_initial(0),
++      frame_subsampling_factor(1),
++      frames_per_chunk(20),
++      acoustic_scale(0.1),
++      debug_computation(false) { }
++
++  void Check() const {
++    KALDI_ASSERT(extra_left_context_initial >= 0 &&
++                 frame_subsampling_factor > 0 && frames_per_chunk > 0 &&
++                 acoustic_scale > 0.0);
++  }
++
++  void Register(OptionsItf *opts) {
++    opts->Register("left-context", &left_context, "left context for compute nnet.");
++    opts->Register("right-context", &right_context, "right context for compute nnet.");
++    opts->Register("extra-left-context-initial", &extra_left_context_initial,
++                   "Extra left context to use at the first frame of an utterance (note: "
++                   "this will just consist of repeats of the first frame, and should not "
++                   "usually be necessary.");
++    opts->Register("frame-subsampling-factor", &frame_subsampling_factor,
++                   "Required if the frame-rate of the output (e.g. in 'chain' "
++                   "models) is less than the frame-rate of the original "
++                   "alignment.");
++    opts->Register("acoustic-scale", &acoustic_scale,
++                   "Scaling factor for acoustic log-likelihoods");
++    opts->Register("frames-per-chunk", &frames_per_chunk,
++                   "Number of frames in each chunk that is separately evaluated "
++                   "by the neural net.  Measured before any subsampling, if the "
++                   "--frame-subsampling-factor options is used (i.e. counts "
++                   "input frames.  This is only advisory (may be rounded up "
++                   "if needed.");
++    opts->Register("debug-computation", &debug_computation, "If true, turn on "
++                   "debug for the actual computation (very verbose!)");
++  }
++};
++
++
++/**
++   When you instantiate class DecodableNnetSimpleLooped, you should give it
++   a const reference to this class, that has been previously initialized.
++ */
++class MaceDecodableNnetSimpleLoopedInfo  {
++ public:
++  // The constructor takes a non-const pointer to 'nnet' because it may have to
++  // modify it to be able to take multiple iVectors.
++  MaceDecodableNnetSimpleLoopedInfo(const MaceComputationOptions &opts,
++                                    MaceComputer *computer);
++
++  // this constructor is for use in testing.
++  MaceDecodableNnetSimpleLoopedInfo(const MaceComputationOptions &opts,
++                                    const Vector<BaseFloat> &priors,
++                                    MaceComputer *computer);
++
++  void Init(const MaceComputationOptions &opts,
++            MaceComputer *computer);
++
++  const MaceComputationOptions &opts;
++
++  MaceComputer *computer;
++
++  // the log priors (or the empty vector if the priors are not set in the model)
++  Vector<BaseFloat> log_priors;
++
++  // frames_left_context equals the model left context plus the value of the
++  // --extra-left-context-initial option.
++  int32 frames_left_context;
++  // frames_right_context is the same as the right-context of the model.
++  int32 frames_right_context;
++  // The frames_per_chunk_ equals the number of input frames we need for each
++  // chunk (except for the first chunk).  This divided by
++  // opts_.frame_subsampling_factor gives the number of output frames.
++  int32 frames_per_chunk;
++
++  // The output dimension of the neural network.
++  int32 output_dim;
++
++  int32 num_ivectors;
++  // True if the neural net accepts iVectors.  If so, the neural net will have been modified
++  // to accept the iVectors
++  bool has_ivectors;
++};
++
++/*
++  This class handles the neural net computation; it's mostly accessed
++  via other wrapper classes.
++
++  It can accept just input features, or input features plus iVectors.  */
++class MaceDecodableNnetSimpleLooped {
++ public:
++  /**
++     This constructor takes features as input, and you can either supply a
++     single iVector input, estimated in batch-mode ('ivector'), or 'online'
++     iVectors ('online_ivectors' and 'online_ivector_period', or none at all.
++     Note: it stores references to all arguments to the constructor, so don't
++     delete them till this goes out of scope.
++
++     @param [in] info   This helper class contains all the static pre-computed information
++                        this class needs, and contains a pointer to the neural net.
++     @param [in] feats  The input feature matrix.
++     @param [in] ivector If you are using iVectors estimated in batch mode,
++                         a pointer to the iVector, else NULL.
++     @param [in] ivector If you are using iVectors estimated in batch mode,
++                         a pointer to the iVector, else NULL.
++     @param [in] online_ivectors
++                        If you are using iVectors estimated 'online'
++                        a pointer to the iVectors, else NULL.
++     @param [in] online_ivector_period If you are using iVectors estimated 'online'
++                        (i.e. if online_ivectors != NULL) gives the periodicity
++                        (in frames) with which the iVectors are estimated.
++  */
++  MaceDecodableNnetSimpleLooped(const MaceDecodableNnetSimpleLoopedInfo &info,
++                                MaceComputer *computer,
++                                const MatrixBase<BaseFloat> &feats,
++                                const VectorBase<BaseFloat> *ivector = NULL,
++                                const MatrixBase<BaseFloat> *online_ivectors = NULL,
++                                int32 online_ivector_period = 1);
++
++
++  // returns the number of frames of likelihoods.  The same as feats_.NumRows()
++  // in the normal case (but may be less if opts_.frame_subsampling_factor !=
++  // 1).
++  inline int32 NumFrames() const { return num_subsampled_frames_; }
++
++  inline int32 OutputDim() const { return info_.output_dim; }
++
++  // Gets the output for a particular frame, with 0 <= frame < NumFrames().
++  // 'output' must be correctly sized (with dimension OutputDim()).  Note:
++  // you're expected to call this, and GetOutput(), in an order of increasing
++  // frames.  If you deviate from this, one of these calls may crash.
++  void GetOutputForFrame(int32 subsampled_frame,
++                         VectorBase<BaseFloat> *output);
++
++  // Gets the output for a particular frame and pdf_id, with
++  // 0 <= subsampled_frame < NumFrames(),
++  // and 0 <= pdf_id < OutputDim().
++  inline BaseFloat GetOutput(int32 subsampled_frame, int32 pdf_id) {
++    KALDI_ASSERT(subsampled_frame >= current_log_post_subsampled_offset_ &&
++                 "Frames must be accessed in order.");
++    while (subsampled_frame >= current_log_post_subsampled_offset_ +
++                            current_log_post_.NumRows())
++      AdvanceChunk();
++    return current_log_post_(subsampled_frame -
++                             current_log_post_subsampled_offset_,
++                             pdf_id);
++  }
++ private:
++  KALDI_DISALLOW_COPY_AND_ASSIGN(MaceDecodableNnetSimpleLooped);
++
++  // This function does the computation for the next chunk.
++  void AdvanceChunk();
++
++  void AdvanceChunkInternal(const MatrixBase<BaseFloat> &input_feats,
++                            const VectorBase<BaseFloat> &ivector);
++
++  // Gets the iVector for the specified frame., if we are
++  // using iVectors (else does nothing).
++  void GetCurrentIvector(int32 input_frame,
++                         Vector<BaseFloat> *ivector);
++
++  // returns dimension of the provided iVectors if supplied, or 0 otherwise.
++  int32 GetIvectorDim() const;
++
++  const MaceDecodableNnetSimpleLoopedInfo &info_;
++
++  MaceComputer *computer_;
++
++  const MatrixBase<BaseFloat> &feats_;
++  // note: num_subsampled_frames_ will equal feats_.NumRows() in the normal case
++  // when opts_.frame_subsampling_factor == 1.
++  int32 num_subsampled_frames_;
++
++  // ivector_ is the iVector if we're using iVectors that are estimated in batch
++  // mode.
++  const VectorBase<BaseFloat> *ivector_;
++
++  // online_ivector_feats_ is the iVectors if we're using online-estimated ones.
++  const MatrixBase<BaseFloat> *online_ivector_feats_;
++  // online_ivector_period_ helps us interpret online_ivector_feats_; it's the
++  // number of frames the rows of ivector_feats are separated by.
++  int32 online_ivector_period_;
++
++  // The current log-posteriors that we got from the last time we
++  // ran the computation.
++  Matrix<BaseFloat> current_log_post_;
++
++  // The number of chunks we have computed so far.
++  int32 num_chunks_computed_;
++
++  // The time-offset of the current log-posteriors, equals
++  // (num_chunks_computed_ - 1) *
++  //    (info_.frames_per_chunk_ / info_.opts_.frame_subsampling_factor).
++  int32 current_log_post_subsampled_offset_;
++};
++
++class MaceDecodableAmNnetSimpleLooped: public DecodableInterface {
++ public:
++  /**
++     This constructor takes features as input, and you can either supply a
++     single iVector input, estimated in batch-mode ('ivector'), or 'online'
++     iVectors ('online_ivectors' and 'online_ivector_period', or none at all.
++     Note: it stores references to all arguments to the constructor, so don't
++     delete them till this goes out of scope.
++
++
++     @param [in] info   This helper class contains all the static pre-computed information
++                        this class needs, and contains a pointer to the neural net.  If
++                        you want prior subtraction to be done, you should have initialized
++                        this with the constructor that takes class AmNnetSimple.
++     @param [in] trans_model  The transition model to use.  This takes care of the
++                        mapping from transition-id (which is an arg to
++                        LogLikelihood()) to pdf-id (which is used internally).
++     @param [in] feats   A pointer to the input feature matrix; must be non-NULL.
++                         We
++     @param [in] ivector If you are using iVectors estimated in batch mode,
++                         a pointer to the iVector, else NULL.
++     @param [in] ivector If you are using iVectors estimated in batch mode,
++                         a pointer to the iVector, else NULL.
++     @param [in] online_ivectors
++                        If you are using iVectors estimated 'online'
++                        a pointer to the iVectors, else NULL.
++     @param [in] online_ivector_period If you are using iVectors estimated 'online'
++                        (i.e. if online_ivectors != NULL) gives the periodicity
++                        (in frames) with which the iVectors are estimated.
++  */
++  MaceDecodableAmNnetSimpleLooped(const MaceDecodableNnetSimpleLoopedInfo &info,
++                                  const TransitionModel &trans_model,
++                                  MaceComputer *computer,
++                                  const MatrixBase<BaseFloat> &feats,
++                                  const VectorBase<BaseFloat> *ivector = NULL,
++                                  const MatrixBase<BaseFloat> *online_ivectors = NULL,
++                                  int32 online_ivector_period = 1);
++
++
++  virtual BaseFloat LogLikelihood(int32 frame, int32 transition_id);
++
++  virtual inline int32 NumFramesReady() const {
++    return decodable_nnet_.NumFrames();
++  }
++
++  virtual int32 NumIndices() const { return trans_model_.NumTransitionIds(); }
++
++  virtual bool IsLastFrame(int32 frame) const {
++    KALDI_ASSERT(frame < NumFramesReady());
++    return (frame == NumFramesReady() - 1);
++  }
++
++ private:
++  KALDI_DISALLOW_COPY_AND_ASSIGN(MaceDecodableAmNnetSimpleLooped);
++  MaceDecodableNnetSimpleLooped decodable_nnet_;
++  const TransitionModel &trans_model_;
++};
++
++
++
++} // namespace nnet3
++} // namespace kaldi
++
++#endif  // KALDI_NNET3_DECODABLE_SIMPLE_LOOPED_H_
+diff --git a/src/mace/mace-online-nnet2-decodable.cc b/src/mace/mace-online-nnet2-decodable.cc
+new file mode 100644
+index 0000000..8a840af
+--- /dev/null
++++ b/src/mace/mace-online-nnet2-decodable.cc
+@@ -0,0 +1,144 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include "mace/mace-online-nnet2-decodable.h"
++
++namespace kaldi {
++namespace MACE {
++
++MaceDecodableNnet2Online::MaceDecodableNnet2Online(
++    MaceComputer *computer,
++    const TransitionModel &trans_model,
++    const MaceDecodableNnet2OnlineOptions &opts,
++    const VectorBase<BaseFloat> &priors,
++    OnlineFeatureInterface *input_feats):
++    features_(input_feats),
++    mace_computer_(computer),
++    trans_model_(trans_model),
++    opts_(opts),
++    feat_dim_(input_feats->Dim()),
++    left_context_(computer->LeftContext()),
++    right_context_(computer->RightContext()),
++    num_pdfs_(computer->OutputDim()),
++    begin_frame_(-1) {
++  KALDI_ASSERT(opts_.max_nnet_batch_size > 0);
++  log_priors_ = priors;
++  KALDI_ASSERT(log_priors_.Dim() == trans_model_.NumPdfs() &&
++               "Priors in neural network not set up (or mismatch "
++               "with transition model).");
++  log_priors_.ApplyLog();
++}
++
++
++
++BaseFloat MaceDecodableNnet2Online::LogLikelihood(int32 frame, int32 index) {
++  ComputeForFrame(frame);
++  int32 pdf_id = trans_model_.TransitionIdToPdf(index);
++  KALDI_ASSERT(frame >= begin_frame_ &&
++               frame < begin_frame_ + scaled_loglikes_.NumRows());
++  return scaled_loglikes_(frame - begin_frame_, pdf_id);
++}
++
++
++bool MaceDecodableNnet2Online::IsLastFrame(int32 frame) const {
++  if (opts_.pad_input) { // normal case
++    return features_->IsLastFrame(frame);
++  } else {
++    return features_->IsLastFrame(frame + left_context_ + right_context_);
++  }
++}
++
++int32 MaceDecodableNnet2Online::NumFramesReady() const {
++  int32 features_ready = features_->NumFramesReady();
++  if (features_ready == 0)
++    return 0;
++  bool input_finished = features_->IsLastFrame(features_ready - 1);
++  if (opts_.pad_input) {
++    // normal case... we'll pad with duplicates of first + last frame to get the
++    // required left and right context.
++    if (input_finished) return features_ready;
++    else return std::max<int32>(0, features_ready - right_context_);
++  } else {
++    return std::max<int32>(0, features_ready - right_context_ - left_context_);
++  }
++}
++
++void MaceDecodableNnet2Online::ComputeForFrame(int32 frame) {
++  int32 features_ready = features_->NumFramesReady();
++  bool input_finished = features_->IsLastFrame(features_ready - 1);
++  KALDI_ASSERT(frame >= 0);
++  if (frame >= begin_frame_ &&
++      frame < begin_frame_ + scaled_loglikes_.NumRows())
++    return;
++  KALDI_ASSERT(frame < NumFramesReady());
++
++  int32 input_frame_begin;
++  if (opts_.pad_input)
++    input_frame_begin = frame - left_context_;
++  else
++    input_frame_begin = frame;
++  int32 max_possible_input_frame_end = features_ready;
++  if (input_finished && opts_.pad_input)
++    max_possible_input_frame_end += right_context_;
++  int32 input_frame_end = std::min<int32>(max_possible_input_frame_end,
++                                          input_frame_begin +
++                                          left_context_ + right_context_ +
++                                          opts_.max_nnet_batch_size);
++  KALDI_ASSERT(input_frame_end > input_frame_begin);
++  Matrix<BaseFloat> features(input_frame_end - input_frame_begin,
++                             feat_dim_);
++  for (int32 t = input_frame_begin; t < input_frame_end; t++) {
++    SubVector<BaseFloat> row(features, t - input_frame_begin);
++    int32 t_modified = t;
++    // The next two if-statements take care of "pad_input"
++    if (t_modified < 0)
++      t_modified = 0;
++    if (t_modified >= features_ready)
++      t_modified = features_ready - 1;
++    features_->GetFrame(t_modified, &row);
++  }
++
++  int32 num_frames_out = input_frame_end - input_frame_begin -
++      left_context_ - right_context_;
++
++  Matrix<BaseFloat> posteriors(num_frames_out, num_pdfs_);
++
++  mace_computer_->AcceptInput(&features);
++
++  // The "false" below tells it not to pad the input: we've already done
++  // any padding that we needed to do.
++
++  mace_computer_->Run();
++
++  mace_computer_->GetOutput(&posteriors);
++
++  posteriors.ApplyFloor(1.0e-20); // Avoid log of zero which leads to NaN.
++  posteriors.ApplyLog();
++  // subtract log-prior (divide by prior)
++  posteriors.AddVecToRows(-1.0f, log_priors_);
++  // apply probability scale.
++  posteriors.Scale(opts_.acoustic_scale);
++
++  // Transfer the scores the CPU for faster access by the
++  // decoding process.
++  scaled_loglikes_.Resize(0, 0);
++  posteriors.Swap(&scaled_loglikes_);
++
++  begin_frame_ = frame;
++}
++
++} // namespace nnet2
++} // namespace kaldi
++#endif
+diff --git a/src/mace/mace-online-nnet2-decodable.h b/src/mace/mace-online-nnet2-decodable.h
+new file mode 100644
+index 0000000..2ccd79c
+--- /dev/null
++++ b/src/mace/mace-online-nnet2-decodable.h
+@@ -0,0 +1,107 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef KALDI_MACE_MACE_ONLINE_NNET2_DECODABLE_H_
++#define KALDI_MACE_MACE_ONLINE_NNET2_DECODABLE_H_
++
++#include "itf/online-feature-itf.h"
++#include "itf/decodable-itf.h"
++#include "hmm/transition-model.h"
++#include "mace-computer.h"
++
++namespace kaldi {
++namespace MACE {
++
++// Note: see also nnet-compute-online.h, which provides a different
++// (lower-level) interface and more efficient for progressive evaluation of an
++// nnet throughout an utterance, with re-use of already-computed activations.
++struct MaceDecodableNnet2OnlineOptions {
++  BaseFloat acoustic_scale;
++  bool pad_input;
++  int32 max_nnet_batch_size;
++
++  MaceDecodableNnet2OnlineOptions():
++      acoustic_scale(0.1),
++      pad_input(true),
++      max_nnet_batch_size(256) { }
++
++  void Register(OptionsItf *opts) {
++    opts->Register("acoustic-scale", &acoustic_scale,
++                   "Scaling factor for acoustic likelihoods");
++    opts->Register("pad-input", &pad_input,
++                   "If true, pad acoustic features with required acoustic context "
++                   "past edges of file.");
++    opts->Register("max-nnet-batch-size", &max_nnet_batch_size,
++                   "Maximum batch size we use in neural-network decodable object, "
++                   "in cases where we are not constrained by currently available "
++                   "frames (this will rarely make a difference)");
++  }
++};
++
++
++/**
++   This Decodable object for class nnet2::AmNnet takes feature input from class
++   OnlineFeatureInterface, unlike, say, class DecodableAmNnet which takes
++   feature input from a matrix.
++*/
++
++class MaceDecodableNnet2Online: public DecodableInterface {
++ public:
++  MaceDecodableNnet2Online(MaceComputer *computer,
++                           const TransitionModel &trans_model,
++                           const MaceDecodableNnet2OnlineOptions &opts,
++                           const VectorBase<BaseFloat> &priors,
++                           OnlineFeatureInterface *input_feats);
++ 
++  /// Returns the scaled log likelihood
++  virtual BaseFloat LogLikelihood(int32 frame, int32 index);
++  virtual bool IsLastFrame(int32 frame) const;
++  virtual int32 NumFramesReady() const;  
++  /// Indices are one-based!  This is for compatibility with OpenFst.
++  virtual int32 NumIndices() const { return trans_model_.NumTransitionIds(); }
++ 
++ private:
++
++  /// If the neural-network outputs for this frame are not cached, it computes
++  /// them (and possibly for some succeeding frames)
++  void ComputeForFrame(int32 frame); 
++  OnlineFeatureInterface *features_;
++  MACE::MaceComputer *mace_computer_;
++//  const AmNnet &nnet_;
++  const TransitionModel &trans_model_;
++  MaceDecodableNnet2OnlineOptions opts_;
++  Vector<BaseFloat> log_priors_;  // log-priors taken from the model.
++  int32 feat_dim_;  // dimensionality of the input features.
++  int32 left_context_;  // Left context of the network (cached here)
++  int32 right_context_;  // Right context of the network (cached here)
++  int32 num_pdfs_;  // Number of pdfs, equals output-dim of the network (cached
++                    // here)
++  int32 begin_frame_;  // First frame for which scaled_loglikes_ is valid
++                       // (i.e. the first frame of the batch of frames for
++                       // which we've computed the output).
++  // scaled_loglikes_ contains the neural network pseudo-likelihoods: the log of
++  // (prob divided by the prior), scaled by opts.acoustic_scale).  We may
++  // compute this using the GPU, but we transfer it back to the system memory
++  // when we store it here.  These scores are only kept for a subset of frames,
++  // starting at begin_frame_, whose length depends how many frames were ready
++  // at the time we called LogLikelihood(), and will never exceed
++  // opts_.max_nnet_batch_size.
++  Matrix<BaseFloat> scaled_loglikes_;
++  KALDI_DISALLOW_COPY_AND_ASSIGN(MaceDecodableNnet2Online);
++};
++
++} // namespace mace
++} // namespace kaldi
++
++#endif // KALDI_MACE_MACE_ONLINE_NNET2_DECODABLE_H_
+diff --git a/src/mace/mace-online-nnet2-decoding.cc b/src/mace/mace-online-nnet2-decoding.cc
+new file mode 100644
+index 0000000..35f372b
+--- /dev/null
++++ b/src/mace/mace-online-nnet2-decoding.cc
+@@ -0,0 +1,80 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include "mace-online-nnet2-decoding.h"
++#include "lat/lattice-functions.h"
++#include "lat/determinize-lattice-pruned.h"
++
++namespace kaldi {
++
++MaceSingleUtteranceNnet2Decoder::MaceSingleUtteranceNnet2Decoder(
++    const LatticeFasterDecoderConfig &decoder_opts,
++    const MACE::MaceDecodableNnet2OnlineOptions &decodable_opts,
++    const TransitionModel &tmodel,
++    MACE::MaceComputer *computer,
++    const VectorBase<BaseFloat> &priors,
++    const fst::Fst<fst::StdArc> &fst,
++    OnlineFeatureInterface *feature_pipeline):
++    decoder_opts_(decoder_opts),
++    feature_pipeline_(feature_pipeline),
++    trans_model_(tmodel),
++    decodable_(computer, tmodel, decodable_opts, priors, feature_pipeline),
++    decoder_(fst, decoder_opts) {
++  decoder_.InitDecoding();
++}
++
++void MaceSingleUtteranceNnet2Decoder::AdvanceDecoding() {
++  decoder_.AdvanceDecoding(&decodable_);
++}
++
++void MaceSingleUtteranceNnet2Decoder::FinalizeDecoding() {
++  decoder_.FinalizeDecoding();
++}
++
++int32 MaceSingleUtteranceNnet2Decoder::NumFramesDecoded() const {
++  return decoder_.NumFramesDecoded();
++}
++
++void MaceSingleUtteranceNnet2Decoder::GetLattice(bool end_of_utterance,
++                                                 CompactLattice *clat) const {
++  if (NumFramesDecoded() == 0)
++    KALDI_ERR << "You cannot get a lattice if you decoded no frames.";
++  Lattice raw_lat;
++  decoder_.GetRawLattice(&raw_lat, end_of_utterance);
++
++  if (!decoder_opts_.determinize_lattice)
++    KALDI_ERR << "--determinize-lattice=false option is not supported at the moment";
++
++  BaseFloat lat_beam = decoder_opts_.lattice_beam;
++  DeterminizeLatticePhonePrunedWrapper(
++      trans_model_, &raw_lat, lat_beam, clat, decoder_opts_.det_opts);
++}
++
++void MaceSingleUtteranceNnet2Decoder::GetBestPath(bool end_of_utterance,
++                                              Lattice *best_path) const {
++  decoder_.GetBestPath(best_path, end_of_utterance);
++}
++
++bool MaceSingleUtteranceNnet2Decoder::EndpointDetected(
++    const OnlineEndpointConfig &config) {
++  return kaldi::EndpointDetected(config, trans_model_,
++                                 feature_pipeline_->FrameShiftInSeconds(),
++                                 decoder_);  
++}
++
++
++}  // namespace kaldi
++
++#endif
+diff --git a/src/mace/mace-online-nnet2-decoding.h b/src/mace/mace-online-nnet2-decoding.h
+new file mode 100644
+index 0000000..e037a90
+--- /dev/null
++++ b/src/mace/mace-online-nnet2-decoding.h
+@@ -0,0 +1,101 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef KALDI_MACE_MACE_ONLINE_NNET2_DECODING_H_
++#define KALDI_MACE_MACE_ONLINE_NNET2_DECODING_H_
++
++#include <string>
++#include <vector>
++#include <deque>
++
++#include "matrix/matrix-lib.h"
++#include "util/common-utils.h"
++#include "base/kaldi-error.h"
++#include "mace-online-nnet2-decodable.h"
++#include "itf/online-feature-itf.h"
++#include "online2/online-endpoint.h"
++#include "decoder/lattice-faster-online-decoder.h"
++#include "hmm/transition-model.h"
++#include "hmm/posterior.h"
++
++namespace kaldi {
++/**
++   You will instantiate this class when you want to decode a single
++   utterance using the online-decoding setup for neural nets.
++*/
++class MaceSingleUtteranceNnet2Decoder {
++ public:
++  // Constructor.  The feature_pipeline_ pointer is not owned in this
++  // class, it's owned externally.
++  MaceSingleUtteranceNnet2Decoder(const LatticeFasterDecoderConfig &decoder_opts,
++                                  const MACE::MaceDecodableNnet2OnlineOptions &decodable_opts,
++                                  const TransitionModel &trans_model,
++                                  MACE::MaceComputer *computer,
++                                  const VectorBase<BaseFloat> &priors,
++                                  const fst::Fst<fst::StdArc> &fst,
++                                  OnlineFeatureInterface *feature_pipeline);
++  
++  /// advance the decoding as far as we can.
++  void AdvanceDecoding();
++
++  /// Finalizes the decoding. Cleans up and prunes remaining tokens, so the
++  /// GetLattice() call will return faster.  You must not call this before
++  /// calling (TerminateDecoding() or InputIsFinished()) and then Wait().
++  void FinalizeDecoding();
++
++  int32 NumFramesDecoded() const;
++  
++  /// Gets the lattice.  The output lattice has any acoustic scaling in it
++  /// (which will typically be desirable in an online-decoding context); if you
++  /// want an un-scaled lattice, scale it using ScaleLattice() with the inverse
++  /// of the acoustic weight.  "end_of_utterance" will be true if you want the
++  /// final-probs to be included.
++  void GetLattice(bool end_of_utterance,
++                  CompactLattice *clat) const;
++  
++  /// Outputs an FST corresponding to the single best path through the current
++  /// lattice. If "use_final_probs" is true AND we reached the final-state of
++  /// the graph then it will include those as final-probs, else it will treat
++  /// all final-probs as one.
++  void GetBestPath(bool end_of_utterance,
++                   Lattice *best_path) const;
++
++
++  /// This function calls EndpointDetected from online-endpoint.h,
++  /// with the required arguments.
++  bool EndpointDetected(const OnlineEndpointConfig &config);
++
++  const LatticeFasterOnlineDecoder &Decoder() const { return decoder_; }
++  
++  ~MaceSingleUtteranceNnet2Decoder() { }
++ private:
++
++  const LatticeFasterDecoderConfig &decoder_opts_;
++
++  OnlineFeatureInterface *feature_pipeline_;
++
++  const TransitionModel &trans_model_;
++  
++  MACE::MaceDecodableNnet2Online decodable_;
++  
++  LatticeFasterOnlineDecoder decoder_;
++  
++};
++
++  
++}  // namespace kaldi
++
++
++
++#endif  // KALDI_MACE_MACE_ONLINE_NNET2_DECODING_H_
+diff --git a/src/mace/mace-online-nnet3-decoding.cc b/src/mace/mace-online-nnet3-decoding.cc
+new file mode 100644
+index 0000000..f6aa583
+--- /dev/null
++++ b/src/mace/mace-online-nnet3-decoding.cc
+@@ -0,0 +1,96 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include "mace-online-nnet3-decoding.h"
++
++namespace kaldi {
++
++template <typename FST>
++MaceSingleUtteranceNnet3DecoderTpl<FST>::MaceSingleUtteranceNnet3DecoderTpl(
++    const LatticeFasterDecoderConfig &decoder_opts,
++    const TransitionModel &trans_model,
++    const MACE::MaceDecodableNnetSimpleLoopedInfo &info,
++    const FST &fst,
++    OnlineNnet2FeaturePipeline *features):
++    decoder_opts_(decoder_opts),
++    input_feature_frame_shift_in_seconds_(features->FrameShiftInSeconds()),
++    trans_model_(trans_model),
++    decodable_(trans_model_, info,
++               features->InputFeature(),
++               features->IvectorFeature()),
++    decoder_(fst, decoder_opts_) {
++  decoder_.InitDecoding();
++}
++
++template <typename FST>
++void MaceSingleUtteranceNnet3DecoderTpl<FST>::InitDecoding(int32 frame_offset) {
++  decoder_.InitDecoding();
++  decodable_.SetFrameOffset(frame_offset);
++}
++
++template <typename FST>
++void MaceSingleUtteranceNnet3DecoderTpl<FST>::AdvanceDecoding() {
++  decoder_.AdvanceDecoding(&decodable_);
++}
++
++template <typename FST>
++void MaceSingleUtteranceNnet3DecoderTpl<FST>::FinalizeDecoding() {
++  decoder_.FinalizeDecoding();
++}
++
++template <typename FST>
++int32 MaceSingleUtteranceNnet3DecoderTpl<FST>::NumFramesDecoded() const {
++  return decoder_.NumFramesDecoded();
++}
++
++template <typename FST>
++void MaceSingleUtteranceNnet3DecoderTpl<FST>::GetLattice(bool end_of_utterance,
++                                             CompactLattice *clat) const {
++  if (NumFramesDecoded() == 0)
++    KALDI_ERR << "You cannot get a lattice if you decoded no frames.";
++  Lattice raw_lat;
++  decoder_.GetRawLattice(&raw_lat, end_of_utterance);
++
++  if (!decoder_opts_.determinize_lattice)
++    KALDI_ERR << "--determinize-lattice=false option is not supported at the moment";
++
++  BaseFloat lat_beam = decoder_opts_.lattice_beam;
++  DeterminizeLatticePhonePrunedWrapper(
++      trans_model_, &raw_lat, lat_beam, clat, decoder_opts_.det_opts);
++}
++
++template <typename FST>
++void MaceSingleUtteranceNnet3DecoderTpl<FST>::GetBestPath(bool end_of_utterance,
++                                              Lattice *best_path) const {
++  decoder_.GetBestPath(best_path, end_of_utterance);
++}
++
++template <typename FST>
++bool MaceSingleUtteranceNnet3DecoderTpl<FST>::EndpointDetected(
++    const OnlineEndpointConfig &config) {
++  BaseFloat output_frame_shift =
++      input_feature_frame_shift_in_seconds_ *
++      decodable_.FrameSubsamplingFactor();
++  return kaldi::EndpointDetected(config, trans_model_,
++                                 output_frame_shift, decoder_);
++}
++
++
++// Instantiate the template for the types needed.
++template class MaceSingleUtteranceNnet3DecoderTpl<fst::Fst<fst::StdArc> >;
++//template class MaceSingleUtteranceNnet3DecoderTpl<fst::GrammarFst>;
++
++}  // namespace kaldi
++#endif
+diff --git a/src/mace/mace-online-nnet3-decoding.h b/src/mace/mace-online-nnet3-decoding.h
+new file mode 100644
+index 0000000..012ac28
+--- /dev/null
++++ b/src/mace/mace-online-nnet3-decoding.h
+@@ -0,0 +1,115 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef KALDI_MACE_MACE_ONLINE_NNET3_DECODING_H_
++#define KALDI_MACE_MACE_ONLINE_NNET3_DECODING_H_
++
++#include <string>
++#include <vector>
++#include <deque>
++
++#include "mace-decodable-online-looped.h"
++#include "online2/online-endpoint.h"
++#include "online2/online-nnet2-feature-pipeline.h"
++
++namespace kaldi {
++/// @addtogroup  onlinedecoding OnlineDecoding
++/// @{
++
++
++/**
++   You will instantiate this class when you want to decode a single utterance
++   using the online-decoding setup for neural nets.  The template will be
++   instantiated only for FST = fst::Fst<fst::StdArc> and FST = fst::GrammarFst.
++*/
++
++template <typename FST>
++class MaceSingleUtteranceNnet3DecoderTpl {
++ public:
++
++  // Constructor. The pointer 'features' is not being given to this class to own
++  // and deallocate, it is owned externally.
++  MaceSingleUtteranceNnet3DecoderTpl(const LatticeFasterDecoderConfig &decoder_opts,
++                                     const TransitionModel &trans_model,
++                                     const MACE::MaceDecodableNnetSimpleLoopedInfo &info,
++                                     const FST &fst,
++                                     OnlineNnet2FeaturePipeline *features);
++
++  /// Initializes the decoding and sets the frame offset of the underlying
++  /// decodable object. This method is called by the constructor. You can also
++  /// call this method when you want to reset the decoder state, but want to
++  /// keep using the same decodable object, e.g. in case of an endpoint.
++  void InitDecoding(int32 frame_offset = 0);
++
++  /// Advances the decoding as far as we can.
++  void AdvanceDecoding();
++
++  /// Finalizes the decoding. Cleans up and prunes remaining tokens, so the
++  /// GetLattice() call will return faster.  You must not call this before
++  /// calling (TerminateDecoding() or InputIsFinished()) and then Wait().
++  void FinalizeDecoding();
++
++  int32 NumFramesDecoded() const;
++
++  /// Gets the lattice.  The output lattice has any acoustic scaling in it
++  /// (which will typically be desirable in an online-decoding context); if you
++  /// want an un-scaled lattice, scale it using ScaleLattice() with the inverse
++  /// of the acoustic weight.  "end_of_utterance" will be true if you want the
++  /// final-probs to be included.
++  void GetLattice(bool end_of_utterance,
++                  CompactLattice *clat) const;
++
++  /// Outputs an FST corresponding to the single best path through the current
++  /// lattice. If "use_final_probs" is true AND we reached the final-state of
++  /// the graph then it will include those as final-probs, else it will treat
++  /// all final-probs as one.
++  void GetBestPath(bool end_of_utterance,
++                   Lattice *best_path) const;
++
++
++  /// This function calls EndpointDetected from online-endpoint.h,
++  /// with the required arguments.
++  bool EndpointDetected(const OnlineEndpointConfig &config);
++
++  const LatticeFasterOnlineDecoderTpl<FST> &Decoder() const { return decoder_; }
++
++  ~MaceSingleUtteranceNnet3DecoderTpl() { }
++ private:
++
++  const LatticeFasterDecoderConfig &decoder_opts_;
++
++  // this is remembered from the constructor; it's ultimately
++  // derived from calling FrameShiftInSeconds() on the feature pipeline.
++  BaseFloat input_feature_frame_shift_in_seconds_;
++
++  // we need to keep a reference to the transition model around only because
++  // it's needed by the endpointing code.
++  const TransitionModel &trans_model_;
++
++  MACE::MaceDecodableAmNnetLoopedOnline decodable_;
++
++  LatticeFasterOnlineDecoderTpl<FST> decoder_;
++
++};
++
++
++typedef MaceSingleUtteranceNnet3DecoderTpl<fst::Fst<fst::StdArc> > MaceSingleUtteranceNnet3Decoder;
++
++/// @} End of "addtogroup maceonlinedecoding"
++
++}  // namespace kaldi
++
++
++
++#endif  // KALDI_MACE_MACE_ONLINE_NNET3_DECODING_H_
+diff --git a/src/macebin/Makefile b/src/macebin/Makefile
+new file mode 100644
+index 0000000..51325e8
+--- /dev/null
++++ b/src/macebin/Makefile
+@@ -0,0 +1,16 @@
++
++all:
++include ../kaldi.mk
++
++LDFLAGS += $(CUDA_LDFLAGS)
++LDLIBS += $(CUDA_LDLIBS)
++
++LDLIBS += $(MACE_LDLIBS)
++LDFLAGS += $(MACE_LDFLAGS)
++
++BINFILES = mace-online-decode
++
++#SOLIBS = ../mace/libkaldi-mace.so
++ADDLIBS = ../mace/kaldi-mace.a
++
++include ../makefiles/default_rules.mk
+\ No newline at end of file
+diff --git a/src/macebin/mace-online-decode.cc b/src/macebin/mace-online-decode.cc
+new file mode 100644
+index 0000000..5ca6389
+--- /dev/null
++++ b/src/macebin/mace-online-decode.cc
+@@ -0,0 +1,120 @@
++// Copyright 2019 The MACE-KIT Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifdef HAVE_MACE
++#include <iostream>
++#include <string>
++#include <unistd.h>
++#include <getopt.h>
++
++#include "mace/kaldi-mace.h"
++
++struct Args_t {
++  std::string configure_file; /* -c option*/
++  std::string fst_file; /* -f option */
++  std::string wav_file; /* -w option */
++  std::string prediction_file; /* -o option */
++  std::string vlog_level; /* -v op */
++} ;
++
++static void show_usage()
++{
++
++  const char *usage =
++      "Reads in wav file(s) and simulates online decoding with neural nets\n"
++          "(nnet3 setup with MaceEngine), with optional iVector-based speaker adaptation and\n"
++          "optional endpointing.  Note: some configuration values and inputs are\n"
++          "set via config files whose filenames are passed as options\n"
++          "\n"
++          "Usage: mace-online-decode \n"
++          " -c, --conf: required, path to configuration file.\n"
++          " -f, --fst: required, path to fst file.\n"
++          " -w, --wav: required, path to input wave file.\n"
++          " -o, --out: required, path to save output predictions, in text mode.\n"
++          " -v, --vlog: optional, enable log for debug if set to (1~5), default is zero.\n";
++
++  std::cerr << usage << std::endl;
++}
++
++bool check_args(Args_t input_args) {
++  return !input_args.prediction_file.empty() &&
++      !input_args.wav_file.empty() &&
++      !input_args.fst_file.empty() &&
++      !input_args.configure_file.empty();
++}
++
++
++int main(int argc, char *argv[]) {
++
++  using namespace kaldi;
++  using namespace std;
++  Args_t input_args;
++  input_args.vlog_level = "";
++  input_args.configure_file = "";
++  input_args.fst_file = "";
++  input_args.wav_file = "";
++  input_args.prediction_file = "";
++  int opt;
++  int option_index = 0;
++  static const char *optString = "hc:f:w:o:v::";
++  static struct option longOptions[] = {
++      {"conf", required_argument, nullptr, 'c'},
++      {"fst",  required_argument, nullptr, 'f'},
++      {"wav", required_argument, nullptr, 'w'},
++      {"out", required_argument, nullptr, 'o'},
++      {"vlog", optional_argument, nullptr, 'v'},
++      {"help", no_argument, nullptr, 'h'},
++      {0, 0, 0, 0}
++  };
++
++  while ( (opt = getopt_long(argc, argv,
++                             optString,
++                             longOptions,
++                             &option_index)) != -1)
++  {
++    switch(opt) {
++      case 'c':
++        input_args.configure_file = optarg;
++        break;
++      case 'f':
++        input_args.fst_file = optarg;
++        break;
++      case 'w':
++        input_args.wav_file = optarg;
++        break;
++      case 'o':
++        input_args.prediction_file = optarg;
++        break;
++      case 'v':
++        input_args.vlog_level = optarg;
++        break;
++      default:
++        show_usage();
++        return -1;
++    }
++  }
++
++  if (check_args(input_args)) {
++    MaceNnet3WavDecode(input_args.configure_file,
++                       input_args.fst_file,
++                       input_args.wav_file,
++                       input_args.prediction_file,
++                       input_args.vlog_level);
++    return 0;
++  } else {
++    show_usage();
++    return -1;
++  }
++} // main()
++#endif
+diff --git a/src/makefiles/mace_rules.mk b/src/makefiles/mace_rules.mk
+new file mode 100644
+index 0000000..7be1f6e
+--- /dev/null
++++ b/src/makefiles/mace_rules.mk
+@@ -0,0 +1,159 @@
++
++SHELL := /bin/bash
++
++ifeq ($(KALDI_FLAVOR), dynamic)
++  ifeq ($(shell uname), Darwin)
++    ifdef ANDROIDINC # cross-compiling enabled on host MacOS
++      ifdef LIBNAME
++        LIBFILE = lib$(LIBNAME).so
++      endif
++      LDFLAGS += -Wl,-rpath -Wl,$(KALDILIBDIR)
++      EXTRA_LDLIBS += $(foreach dep,$(ADDLIBS), $(dir $(dep))$(notdir $(basename $(dep))).a)
++    else
++      ifdef LIBNAME
++        LIBFILE = lib$(LIBNAME).dylib
++      endif
++      LDFLAGS += -Wl,-rpath -Wl,$(KALDILIBDIR)
++      EXTRA_LDLIBS += $(foreach dep,$(ADDLIBS), $(dir $(dep))lib$(notdir $(basename $(dep))).dylib)
++    endif
++  else ifeq ($(shell uname), Linux)
++    ifdef LIBNAME
++      LIBFILE = lib$(LIBNAME).so
++    endif
++    LDFLAGS += -Wl,-rpath=$(shell readlink -f $(KALDILIBDIR))
++    EXTRA_LDLIBS += $(foreach dep,$(ADDLIBS), $(dir $(dep))$(notdir $(basename $(dep))).a)
++  else  # Platform not supported
++    $(error Dynamic libraries not supported on this platform. Run configure with --static flag.)
++  endif
++  XDEPENDS =
++else
++  ifdef LIBNAME
++    LIBFILE = $(LIBNAME).a
++  endif
++  XDEPENDS = $(ADDLIBS)
++endif
++
++all: $(LIBFILE) $(BINFILES)
++
++
++ifdef LIBNAME
++
++$(LIBNAME).a: $(OBJFILES)
++	$(AR) -cr $(LIBNAME).a $(OBJFILES)
++	$(RANLIB) $(LIBNAME).a
++
++ifeq ($(KALDI_FLAVOR), dynamic)
++# the LIBFILE is not the same as $(LIBNAME).a
++$(LIBFILE): $(LIBNAME).a
++  ifeq ($(shell uname), Darwin)
++	$(CXX) -dynamiclib -o $@ -install_name @rpath/$@ $(LDFLAGS) $(OBJFILES) $(LDLIBS)
++	ln -sf $(shell pwd)/$@ $(KALDILIBDIR)/$@
++  else ifeq ($(shell uname), Linux)
++        # Building shared library from static (static was compiled with -fPIC)
++	$(CXX) -shared -o $@ -Wl,--no-undefined -Wl,--as-needed  -Wl,-soname=$@,--whole-archive $(LIBNAME).a -Wl,--no-whole-archive $(LDFLAGS) $(LDLIBS)
++	ln -sf $(shell pwd)/$@ $(KALDILIBDIR)/$@
++  else  # Platform not supported
++	$(error Dynamic libraries not supported on this platform. Run configure with --static flag.)
++  endif
++endif # ifeq ($(KALDI_FLAVOR), dynamic)
++endif # ifdef LIBNAME
++
++# By default (GNU) make uses the C compiler $(CC) for linking object files even
++# if they were compiled from a C++ source. Below redefinition forces make to
++# use the C++ compiler $(CXX) instead.
++LINK.o = $(CXX) $(LDFLAGS) $(TARGET_ARCH)
++
++$(BINFILES): $(LIBFILE) $(XDEPENDS)
++
++# When building under CI, CI_NOLINKBINARIES is set to skip linking of binaries.
++ifdef CI_NOLINKBINARIES
++$(BINFILES): %: %.o
++	touch $@
++endif
++
++# Rule below would expand to, e.g.:
++# ../base/kaldi-base.a:
++# 	make -C ../base kaldi-base.a
++# -C option to make is same as changing directory.
++%.a:
++	$(MAKE) -C ${@D} ${@F}
++
++%.so:
++	$(MAKE) -C ${@D} ${@F}
++
++clean:
++	-rm -f *.o *.a *.so $(TESTFILES) $(BINFILES) $(TESTOUTPUTS) tmp* *.tmp *.testlog
++
++distclean: clean
++	-rm -f .depend.mk
++
++$(TESTFILES): $(LIBFILE) $(XDEPENDS)
++
++test_compile: $(TESTFILES)
++
++test: test_compile
++	@{ result=0;			\
++	for x in $(TESTFILES); do	\
++	  printf "Running $$x ...";	\
++      timestamp1=$$(date +"%s"); \
++	  ./$$x >$$x.testlog 2>&1;	\
++      ret=$$? \
++      timestamp2=$$(date +"%s"); \
++      time_taken=$$[timestamp2-timestamp1]; \
++	  if [ $$ret -ne 0 ]; then \
++	    echo " $${time_taken}s... FAIL $$x"; \
++	    result=1;			\
++	    if [ -n "$TRAVIS" ] && [ -f core ] && command -v gdb >/dev/null 2>&1; then	\
++	      gdb $$x core -ex "thread apply all bt" -batch >>$$x.testlog 2>&1;		\
++	      rm -rf core;		\
++	    fi;				\
++	  else				\
++	    echo " $${time_taken}s... SUCCESS $$x";		\
++	    rm -f $$x.testlog;		\
++	  fi;				\
++	done;				\
++	exit $$result; }
++
++# Rules that enable valgrind debugging ("make valgrind")
++
++valgrind: .valgrind
++
++.valgrind: $(TESTFILES)
++	echo -n > valgrind.out
++	for x in $(TESTFILES); do \
++		echo $$x >>valgrind.out; \
++		valgrind ./$$x >/dev/null 2>> valgrind.out; \
++	done
++	! ( grep 'ERROR SUMMARY' valgrind.out | grep -v '0 errors' )
++	! ( grep 'definitely lost' valgrind.out | grep -v -w 0 )
++	rm valgrind.out
++	touch .valgrind
++
++
++#buid up dependency commands
++CC_SRCS=$(wildcard *.cc)
++#check if files exist to run dependency commands on
++ifneq ($(CC_SRCS),)
++CC_DEP_COMMAND=$(CXX) -M $(CXXFLAGS) $(CC_SRCS)
++endif
++
++ifeq ($(CUDA), true)
++CUDA_SRCS=$(wildcard *.cu)
++#check if files exist to run dependency commands on
++ifneq ($(CUDA_SRCS),)
++NVCC_DEP_COMMAND = $(CUDATKDIR)/bin/nvcc -M $(CUDA_FLAGS) $(CUDA_INCLUDE) $(CUDA_SRCS)
++endif
++endif
++
++depend:
++	rm -f .depend.mk
++ifneq ($(CC_DEP_COMMAND),)
++	$(CC_DEP_COMMAND) >> .depend.mk
++endif
++ifneq ($(NVCC_DEP_COMMAND),)
++	$(NVCC_DEP_COMMAND) >> .depend.mk
++endif
++
++# removing automatic making of "depend" as it's quite slow.
++#.depend.mk: depend
++-include .depend.mk
+diff --git a/src/nnet3/decodable-online-looped.cc b/src/nnet3/decodable-online-looped.cc
+index 7514386..7fb5304 100644
+--- a/src/nnet3/decodable-online-looped.cc
++++ b/src/nnet3/decodable-online-looped.cc
+@@ -198,7 +198,7 @@ void DecodableNnetLoopedOnlineBase::AdvanceChunk() {
+ 
+     // note: we expect num_ivectors to be 1 in practice.
+     Matrix<BaseFloat> ivectors(num_ivectors,
+-			       ivector.Dim());
++		    ivector.Dim());
+     ivectors.CopyRowsFromVec(ivector);
+     CuMatrix<BaseFloat> cu_ivectors;
+     cu_ivectors.Swap(&ivectors);
+diff --git a/tools/libmace/include/mace/port/env.h b/tools/libmace/include/mace/port/env.h
+new file mode 100644
+index 0000000..7ac060d
+--- /dev/null
++++ b/tools/libmace/include/mace/port/env.h
+@@ -0,0 +1,144 @@
++// Copyright 2019 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_PORT_ENV_H_
++#define MACE_PORT_ENV_H_
++
++#include <cstdint>
++#include <cstdlib>
++#include <memory>
++#include <sstream>
++#include <string>
++#include <vector>
++
++#ifdef _WIN32
++#include <malloc.h>
++#endif
++
++#include <sys/stat.h>
++
++#include "mace/public/mace.h"
++
++namespace mace {
++namespace port {
++
++class MallocLogger {
++ public:
++  MallocLogger() = default;
++  virtual ~MallocLogger() = default;
++};
++
++class FileSystem;
++class LogWriter;
++
++class Env {
++ public:
++  virtual int64_t NowMicros() = 0;
++  virtual MaceStatus AdviseFree(void *addr, size_t length);
++  virtual MaceStatus GetCPUMaxFreq(std::vector<float> *max_freqs);
++  virtual MaceStatus SchedSetAffinity(const std::vector<size_t> &cpu_ids);
++  virtual FileSystem *GetFileSystem() = 0;
++  virtual LogWriter *GetLogWriter() = 0;
++  // Return the current backtrace, will allocate memory inside the call
++  // which may fail
++  virtual std::vector<std::string> GetBackTraceUnsafe(int max_steps) = 0;
++  virtual std::unique_ptr<MallocLogger> NewMallocLogger(
++      std::ostringstream *oss,
++      const std::string &name);
++
++  static Env *Default();
++};
++
++}  // namespace port
++
++inline int64_t NowMicros() {
++  return port::Env::Default()->NowMicros();
++}
++
++inline MaceStatus AdviseFree(void *addr, size_t length) {
++  return port::Env::Default()->AdviseFree(addr, length);
++}
++
++inline MaceStatus GetCPUMaxFreq(std::vector<float> *max_freqs) {
++  return port::Env::Default()->GetCPUMaxFreq(max_freqs);
++}
++
++inline MaceStatus SchedSetAffinity(const std::vector<size_t> &cpu_ids) {
++  return port::Env::Default()->SchedSetAffinity(cpu_ids);
++}
++
++inline port::FileSystem *GetFileSystem() {
++  return port::Env::Default()->GetFileSystem();
++}
++
++inline MaceStatus Memalign(void **memptr, size_t alignment, size_t size) {
++#ifdef _WIN32
++  *memptr = _aligned_malloc(size, alignment);
++  if (*memptr == nullptr) {
++    return MaceStatus::MACE_OUT_OF_RESOURCES;
++  } else {
++    return MaceStatus::MACE_SUCCESS;
++  }
++#else
++#if defined(__ANDROID__) || defined(__hexagon__)
++  *memptr = memalign(alignment, size);
++  if (*memptr == nullptr) {
++    return MaceStatus::MACE_OUT_OF_RESOURCES;
++  } else {
++    return MaceStatus::MACE_SUCCESS;
++  }
++#else
++  int error = posix_memalign(memptr, alignment, size);
++  if (error != 0) {
++    if (*memptr != nullptr) {
++      free(*memptr);
++      *memptr = nullptr;
++    }
++    return MaceStatus::MACE_OUT_OF_RESOURCES;
++  } else {
++    return MaceStatus::MACE_SUCCESS;
++  }
++#endif
++#endif
++}
++
++inline MaceStatus GetEnv(const char *name, std::string *value) {
++#ifdef _WIN32
++  char *val;
++  size_t len;
++  errno_t error = _dupenv_s(&val, &len, name);
++  if (error != 0) {
++    return MaceStatus::MACE_RUNTIME_ERROR;
++  } else {
++    if (val != nullptr) {
++      *value = std::string(val);
++      free(val);
++    }
++    return MaceStatus::MACE_SUCCESS;
++  }
++#else
++  char *val = getenv(name);
++  if (val != nullptr) {
++    *value = std::string(val);
++  }
++  return MaceStatus::MACE_SUCCESS;
++#endif
++}
++
++#if defined(_WIN32) && !defined(S_ISREG)
++#define S_ISREG(m) (((m) & 0170000) == (0100000))
++#endif
++}  // namespace mace
++
++#endif  // MACE_PORT_ENV_H_
+diff --git a/tools/libmace/include/mace/port/file_system.h b/tools/libmace/include/mace/port/file_system.h
+new file mode 100644
+index 0000000..2117fae
+--- /dev/null
++++ b/tools/libmace/include/mace/port/file_system.h
+@@ -0,0 +1,75 @@
++// Copyright 2019 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_PORT_FILE_SYSTEM_H_
++#define MACE_PORT_FILE_SYSTEM_H_
++
++#include <cerrno>
++#include <string>
++#include <memory>
++
++#include "mace/public/mace.h"
++#include "mace/utils/macros.h"
++
++namespace mace {
++namespace port {
++
++class ReadOnlyMemoryRegion {
++ public:
++  ReadOnlyMemoryRegion() = default;
++  virtual ~ReadOnlyMemoryRegion() = default;
++  virtual const void *data() const = 0;
++  virtual uint64_t length() const = 0;
++ private:
++  MACE_DISABLE_COPY_AND_ASSIGN(ReadOnlyMemoryRegion);
++};
++
++class ReadOnlyBufferMemoryRegion : public ReadOnlyMemoryRegion {
++ public:
++  ReadOnlyBufferMemoryRegion() : data_(nullptr), length_(0) {}
++  ReadOnlyBufferMemoryRegion(const void *data, uint64_t length) :
++    data_(data), length_(length) {}
++  const void *data() const override { return data_; }
++  uint64_t length() const override { return length_; }
++
++ private:
++  const void *data_;
++  uint64_t length_;
++};
++
++class WritableFile {
++ public:
++  WritableFile() {}
++  virtual ~WritableFile();
++  virtual MaceStatus Append(const char *data, size_t length) = 0;
++  virtual MaceStatus Close() = 0;
++  virtual MaceStatus Flush() = 0;
++ private:
++  MACE_DISABLE_COPY_AND_ASSIGN(WritableFile);
++};
++
++class FileSystem {
++ public:
++  FileSystem() = default;
++  virtual ~FileSystem() = default;
++  virtual MaceStatus NewReadOnlyMemoryRegionFromFile(const char *fname,
++      std::unique_ptr<ReadOnlyMemoryRegion>* result) = 0;
++  virtual MaceStatus NewWritableFile(const char *fname,
++      std::unique_ptr<WritableFile>* result);
++};
++
++}  // namespace port
++}  // namespace mace
++
++#endif  // MACE_PORT_FILE_SYSTEM_H_
+diff --git a/tools/libmace/include/mace/port/logger.h b/tools/libmace/include/mace/port/logger.h
+new file mode 100644
+index 0000000..08bcbbe
+--- /dev/null
++++ b/tools/libmace/include/mace/port/logger.h
+@@ -0,0 +1,95 @@
++// Copyright 2019 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_PORT_LOGGER_H_
++#define MACE_PORT_LOGGER_H_
++
++#include <cstdlib>
++#include <cstring>
++#include <sstream>
++
++namespace mace {
++
++enum LogLevel {
++  INVALID_MIN = 0,
++  INFO        = 1,
++  WARNING     = 2,
++  ERROR       = 3,
++  FATAL       = 4,
++  INVALID_MAX,
++};
++
++namespace port {
++
++inline bool LogLevelPassThreashold(const LogLevel level,
++                                   const LogLevel threshold) {
++  return level >= threshold;
++}
++
++LogLevel LogLevelFromStr(const char *log_level_str);
++int VLogLevelFromStr(const char *vlog_level_str);
++
++inline LogLevel MinLogLevelFromEnv() {
++  // Read the min log level from env once during the first call to logging.
++  static LogLevel log_level = LogLevelFromStr(getenv("MACE_CPP_MIN_LOG_LEVEL"));
++  return log_level;
++}
++
++inline int MinVLogLevelFromEnv() {
++  // Read the min vlog level from env once during the first call to logging.
++  static int vlog_level = VLogLevelFromStr(getenv("MACE_CPP_MIN_VLOG_LEVEL"));
++  return vlog_level;
++}
++
++class LogWriter {
++ public:
++  LogWriter() = default;
++  virtual ~LogWriter() = default;
++  virtual void WriteLogMessage(const char *fname,
++                               const int line,
++                               const LogLevel severity,
++                               const char *message);
++};
++
++class Logger : public std::ostringstream {
++ public:
++  Logger(const char *fname, int line, LogLevel severity);
++  ~Logger();
++
++ private:
++  void GenerateLogMessage();
++  void DealWithFatal();
++
++  const char *fname_;
++  int line_;
++  LogLevel severity_;
++};
++
++}  // namespace port
++
++// Whether the log level pass the env configured threshold, can be used for
++// short cutting.
++inline bool ShouldGenerateLogMessage(LogLevel severity) {
++  LogLevel threshold = port::MinLogLevelFromEnv();
++  return port::LogLevelPassThreashold(severity, threshold);
++}
++
++inline bool ShouldGenerateVLogMessage(int vlog_level) {
++  int threshold = port::MinVLogLevelFromEnv();
++  return ShouldGenerateLogMessage(INFO) &&
++         vlog_level <= threshold;
++}
++}  // namespace mace
++
++#endif  // MACE_PORT_LOGGER_H_
+diff --git a/tools/libmace/include/mace/port/port-arch.h b/tools/libmace/include/mace/port/port-arch.h
+new file mode 100644
+index 0000000..113c551
+--- /dev/null
++++ b/tools/libmace/include/mace/port/port-arch.h
+@@ -0,0 +1,30 @@
++// Copyright 2019 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_PORT_PORT_ARCH_H_
++#define MACE_PORT_PORT_ARCH_H_
++
++#if defined __APPLE__
++# define MACE_OS_MAC 1
++# if TARGET_OS_IPHONE
++#  define MACE_OS_IOS 1
++# endif
++#elif defined __linux__
++# define MACE_OS_LINUX 1
++# if defined(__ANDROID__) || defined(ANDROID)
++#  define MACE_OS_LINUX_ANDROID 1
++# endif
++#endif
++
++#endif  // MACE_PORT_PORT_ARCH_H_
+diff --git a/tools/libmace/include/mace/port/port.h b/tools/libmace/include/mace/port/port.h
+new file mode 100644
+index 0000000..7e215c1
+--- /dev/null
++++ b/tools/libmace/include/mace/port/port.h
+@@ -0,0 +1,26 @@
++// Copyright 2019 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_PORT_PORT_H_
++#define MACE_PORT_PORT_H_
++
++#include "mace/port/port-arch.h"
++#include "mace/public/mace.h"
++#include "mace/utils/logging.h"
++
++#if defined(MACE_OS_LINUX_ANDROID)
++#define MACE_THREAD_POOL_USE_SPIN 1
++#endif  // MACE_OS_LINUX_ANDROID
++
++#endif  // MACE_PORT_PORT_H_
+diff --git a/tools/libmace/include/mace/public/mace.h b/tools/libmace/include/mace/public/mace.h
+new file mode 100644
+index 0000000..d2c7686
+--- /dev/null
++++ b/tools/libmace/include/mace/public/mace.h
+@@ -0,0 +1,484 @@
++// Copyright 2018 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++// This file defines core MACE APIs.
++// There APIs will be stable and backward compatible.
++
++#ifndef MACE_PUBLIC_MACE_H_
++#define MACE_PUBLIC_MACE_H_
++
++#include <cstdint>
++#include <map>
++#include <memory>
++#include <string>
++#include <vector>
++
++#ifndef MACE_API
++#ifdef _MSC_VER
++#define MACE_API
++#else
++#define MACE_API __attribute__((visibility("default")))
++#endif
++#endif
++
++#ifndef MACE_DEPRECATED
++#ifdef _MSC_VER
++#define MACE_DEPRECATED
++#else
++#define MACE_DEPRECATED __attribute__((deprecated))
++#endif
++#endif
++
++namespace mace {
++
++class NetDef;
++
++enum DeviceType { CPU = 0, GPU = 2, HEXAGON = 3, HTA = 4, APU = 5 };
++
++enum class DataFormat {
++  NONE = 0, NHWC = 1, NCHW = 2,
++  HWOI = 100, OIHW = 101, HWIO = 102, OHWI = 103,
++  AUTO = 1000,
++};
++
++enum GPUPerfHint {
++  PERF_DEFAULT = 0,
++  PERF_LOW = 1,
++  PERF_NORMAL = 2,
++  PERF_HIGH = 3
++};
++
++enum GPUPriorityHint {
++  PRIORITY_DEFAULT = 0,
++  PRIORITY_LOW = 1,
++  PRIORITY_NORMAL = 2,
++  PRIORITY_HIGH = 3
++};
++
++// AFFINITY_NONE: initiate 'num_threads_hint' threads with no affinity
++// scheduled.
++// If 'num_threads_hint' is -1 or greater than number of available cores,
++// 'num_threads_hint' will be reset to number of available cores.
++// AFFINITY_BIG_ONLY: all available big cores are used, and number of threads
++// is equal to numbers of available big cores.
++// AFFINITY_LITTLE_ONLY: all available little cores are used, and number of
++// threads is equal to numbers of available little cores.
++// AFFINITY_HIGH_PERFORMANCE: initiate 'num_threads_hint' threads on different
++// cores with top-num_threads_hint frequencies.
++// If 'num_threads_hint' is -1 or greater than number of available cores,
++// 'num_threads_hint' will be reset to number of available cores.
++// AFFINITY_POWER_SAVE: initiate 'num_threads_hint' threads on different
++// cores with bottom-num_threads_hint frequencies.
++// If 'num_threads_hint' is -1 or greater than number of available cores,
++// 'num_threads_hint' will be reset to number of available cores.
++enum CPUAffinityPolicy {
++  AFFINITY_NONE = 0,
++  AFFINITY_BIG_ONLY = 1,
++  AFFINITY_LITTLE_ONLY = 2,
++  AFFINITY_HIGH_PERFORMANCE = 3,
++  AFFINITY_POWER_SAVE = 4,
++};
++
++// Voltage corners for clock frequencies, please refer to
++// docs/Hap_power_set_dcvs_2.html in Hexagon SDK for more detailed information.
++enum HexagonNNCornerType {
++  HEXAGON_NN_CORNER_RELEASE,
++  HEXAGON_NN_CORNER_TURBO,
++  HEXAGON_NN_CORNER_NOMPLUS,
++  HEXAGON_NN_CORNER_NOMINAL,
++  HEXAGON_NN_CORNER_SVSPLUS,
++  HEXAGON_NN_CORNER_SVS,
++  HEXAGON_NN_CORNER_SVS2,
++};
++
++struct CallStats {
++  int64_t start_micros;
++  int64_t end_micros;
++};
++
++struct ConvPoolArgs {
++  std::vector<int> strides;
++  int padding_type;
++  std::vector<int> paddings;
++  std::vector<int> dilations;
++  std::vector<int64_t> kernels;
++};
++
++struct OperatorStats {
++  std::string operator_name;
++  std::string type;
++  std::vector<std::vector<int64_t>> output_shape;
++  ConvPoolArgs args;
++  CallStats stats;
++};
++
++class RunMetadata {
++ public:
++  std::vector<OperatorStats> op_stats;
++};
++
++/// Consistent with Android NNAPI
++struct PerformanceInfo {
++  // Time of executing some workload(millisecond).
++  // negative value for unsupported.
++  float exec_time;
++};
++
++struct Capability {
++  // Performance of running with float32 data type
++  // run time of the workload for CPU device,
++  // ratio of run time to execute same workload compared to the time the CPU
++  // execute same workload.
++  PerformanceInfo float32_performance;
++
++  // Performance of running with quantized-8 data type
++  // ratio compared with float32_performance
++  PerformanceInfo quantized8_performance;
++
++  // support or not
++  bool supported;
++};
++
++/// Get Devices Capacity
++///
++/// The float32_performance of CPU and GPU is tested using the workload of
++/// first 8 layer of mobilenet-v2 which contain Conv(1x1, 3x3),
++/// DepthwiseConv(3x3) and ElementWise Ops.
++/// The quantized8_performance is just a arbitrary value tested
++/// using mobilenet-v2 offline
++/// Actually, It's hard to test the precise performance, the result could be
++/// more accurate when your model is like with mobilenet-v2, otherwise the
++/// value is just a reference.
++///
++/// \return capability of the device
++MACE_API Capability GetCapability(DeviceType device_type,
++                                  float cpu_float32_exec_time = 1.f);
++
++MACE_API const char *MaceVersion();
++
++class MACE_API MaceStatus {
++ public:
++  enum Code {
++    MACE_SUCCESS = 0,
++    MACE_INVALID_ARGS = 1,
++    MACE_OUT_OF_RESOURCES = 2,
++    MACE_UNSUPPORTED = 3,
++    MACE_RUNTIME_ERROR = 4,
++  };
++
++ public:
++  MaceStatus();
++  MaceStatus(const Code code);  // NOLINT(runtime/explicit)
++  MaceStatus(const Code code, const std::string &information);
++  MaceStatus(const MaceStatus &);
++  MaceStatus(MaceStatus &&);
++  MaceStatus &operator=(const MaceStatus &);
++  MaceStatus &operator=(const MaceStatus &&);
++  ~MaceStatus();
++  Code code() const;
++  std::string information() const;
++
++  bool operator==(const MaceStatus &other) const;
++  bool operator!=(const MaceStatus &other) const;
++
++ private:
++  class Impl;
++  std::unique_ptr<Impl> impl_;
++};
++
++/// \brief GPU context contain the status used for GPU device.
++///
++/// There are some data in common between different MaceEngines using GPU,
++/// use one GPUContext could avoid duplication.
++///
++/// Thread-safe.
++/// You could use one GPUContext for multiple parallel MaceEngines.
++class GPUContext;
++
++/// \brief GPUContext builder.
++///
++/// Use the GPUContextBuilder to generate GPUContext.
++/// Not thread-safe
++class MACE_API GPUContextBuilder {
++ public:
++  GPUContextBuilder();
++  ~GPUContextBuilder();
++  GPUContextBuilder(const GPUContextBuilder &) = delete;
++  GPUContextBuilder(GPUContextBuilder &&) = delete;
++  GPUContextBuilder &operator=(const GPUContextBuilder &) = delete;
++  GPUContextBuilder &operator=(GPUContextBuilder &&) = delete;
++
++  /// \brief Set internal storage factory to store internal data.
++  ///
++  /// Now the path is used to store the built OpenCL binaries to file,
++  /// which could speed up the GPU initialization and first run.
++  /// If do not call this API, the initialization maybe slow for GPU.
++  ///
++  /// \param path  Make sure your program have Read/Write permission of the path
++  /// \return
++  GPUContextBuilder &SetStoragePath(const std::string &path);
++  /// \brief Set paths of generated OpenCL compiled kernel binary file (not libOpenCL.so)  // NOLINT(whitespace/line_length)
++  ///
++  /// If you use GPU of specific soc, using OpenCL binary will speed up the initialization.  // NOLINT(whitespace/line_length)
++  /// OpenCL binary is corresponding to the OpenCL Driver version,
++  /// you should update the binary when OpenCL Driver changed.
++  ///
++  /// \param paths MACE will use first file found in all paths
++  /// \return
++  GPUContextBuilder &SetOpenCLBinaryPaths(
++      const std::vector<std::string> &paths);
++
++  /// \brief Set generated OpenCL compiled kernel binary with bytes array
++  ///
++  /// If you use GPU of specific soc, using OpenCL binary will speed up the initialization.  // NOLINT(whitespace/line_length)
++  /// OpenCL binary is corresponding to the OpenCL Driver version,
++  /// you should update the binary when OpenCL Driver changed.
++  ///
++  /// \param data Byte stream of OpenCL binary file
++  /// \param size Size of byte stream (data)
++  /// \return
++  GPUContextBuilder &SetOpenCLBinary(const unsigned char *data,
++                                     const size_t size);
++  /// \brief Set the path of generated OpenCL parameter file
++  ///
++  /// If you use GPU for specific soc, the parameters is the local work group
++  /// size tuned for specific SOC, which may be faster than the
++  /// general parameters.
++  ///
++  /// \param path Make sure your program have Read/Write permission of the path
++  /// \return
++  GPUContextBuilder &SetOpenCLParameterPath(const std::string &path);
++  /// \brief Set generated OpenCL parameter with bytes array
++  ///
++  /// If you use GPU for specific soc, the parameters is the local work group
++  /// size tuned for specific SOC, which may be faster than the
++  /// general parameters.
++  ///
++  /// \param data Byte stream of OpenCL parameter file
++  /// \param size Size of byte stream (data)
++  /// \return
++  GPUContextBuilder &SetOpenCLParameter(const unsigned char *data,
++                                        const size_t size);
++
++  std::shared_ptr<GPUContext> Finalize();
++
++ private:
++  class Impl;
++  std::unique_ptr<Impl> impl_;
++};
++
++class MACE_API MaceEngineConfig {
++  friend class MaceEngine;
++
++ public:
++  explicit MaceEngineConfig(const DeviceType device_type);
++  ~MaceEngineConfig();
++  MaceEngineConfig(const MaceEngineConfig &) = delete;
++  MaceEngineConfig(const MaceEngineConfig &&) = delete;
++  MaceEngineConfig &operator=(const MaceEngineConfig &) = delete;
++  MaceEngineConfig &operator=(const MaceEngineConfig &&) = delete;
++
++  /// \brief Set GPUContext
++  ///
++  /// Just use one GPUContext for multiple models run on GPU.
++  /// \param context created use GPUContextBuilder
++  /// \return MaceStatus::MACE_SUCCESS for success, other for failure.
++  MaceStatus SetGPUContext(std::shared_ptr<GPUContext> context);
++
++  /// \brief Set GPU hints, currently only supports Adreno GPU.
++  ///
++  /// Caution: this function may hurt performance
++  /// if improper parameters provided.
++  ///
++  /// \param perf_hint  performance hint
++  /// \param priority_hint  priority hint
++  /// \return MaceStatus::MACE_SUCCESS for success, other for failure.
++  MaceStatus SetGPUHints(GPUPerfHint perf_hint,
++                         GPUPriorityHint priority_hint);
++
++  /// \brief Set CPU threads number and affinity policy.
++  ///
++  /// Caution: this function may hurt performance if improper
++  /// parameters provided. When num_threads_hint is zero or negative,
++  /// the function will set the threads number equaling to the number of
++  /// big (AFFINITY_BIG_ONLY), little (AFFINITY_LITTLE_ONLY) or all
++  /// (AFFINITY_NONE) cores according to the policy. The threads number will
++  /// also be truncated to the corresponding cores number when num_threads_hint
++  /// is larger than it.
++  /// The OpenMP threads will be bind to (via sched_setaffinity) big cores
++  /// (AFFINITY_BIG_ONLY) and little cores (AFFINITY_LITTLE_ONLY).
++  ///
++  /// \param num_threads_hint it is only a hint.
++  /// \param policy one of CPUAffinityPolicy
++  /// \param status MACE_SUCCESS for successful, or it can't reliabley
++  /// detect big-LITTLE cores (see GetBigLittleCoreIDs). In such cases, it's
++  /// suggested to use AFFINITY_NONE to use all cores.
++  /// \return MaceStatus::MACE_SUCCESS for success, other for failure.
++  MaceStatus SetCPUThreadPolicy(int num_threads_hint,
++                                CPUAffinityPolicy policy);
++
++  /// \brief Set Hexagon DSP power parameters
++  ///
++  /// Caution: this function may hurt performance if improper
++  /// parameters provided. For most performance critical applications, set
++  /// HexagonNNCornerType to HEXAGON_NN_CORNER_TURBO, enable dynamic clock
++  /// voltage scaling(DCVS) and set sleep latency to 100us works just fine.
++  /// If a more balanced scheme between performance and power consumption
++  /// is needed, these three parameters may be tweaked to achieve that.
++  /// \param corner DCVS voltage target corner, can be set even when DCVS
++  /// is disabled.
++  /// \param dcvs_enable enable or disable DCVS.
++  /// \param latency sleep latency, in micro seconds.
++  /// \return MaceStatus::MACE_SUCCESS for success, other for failure.
++  MaceStatus SetHexagonPower(HexagonNNCornerType corner,
++                             bool dcvs_enable,
++                             int latency);
++
++ private:
++  class Impl;
++  std::unique_ptr<Impl> impl_;
++};
++
++// MACE input/output tensor
++class MACE_API MaceTensor {
++  friend class MaceEngine;
++
++ public:
++  // shape - the shape of the tensor, with size n, if shape is unknown
++  // in advance, it should be specified large enough to hold tensor of all
++  // possible size.
++  // data - the buffer of the tensor, must not be null with size equals
++  //        shape[0] * shape[1] * ... * shape[n-1].
++  //        If you want to pass a buffer which is unsuitable to use the default
++  //        shared_ptr deleter (for example, the buffer is not dynamically
++  //        allocated by C++, e.g. a C buffer), you can set customized deleter
++  //        of shared_ptr and manage the life cycle of the buffer by yourself.
++  //        For example, std::shared_ptr<float>(raw_buffer, [](float *){});
++  MaceTensor(const std::vector<int64_t> &shape,
++             std::shared_ptr<void> data,
++             const DataFormat format = DataFormat::NHWC);
++  MaceTensor();
++  MaceTensor(const MaceTensor &other);
++  MaceTensor(const MaceTensor &&other);
++  MaceTensor &operator=(const MaceTensor &other);
++  MaceTensor &operator=(const MaceTensor &&other);
++  ~MaceTensor();
++
++  // shape will be updated to the actual output shape after running.
++  const std::vector<int64_t> &shape() const;
++  const std::shared_ptr<float> data() const;
++  std::shared_ptr<float> data();
++  template <typename T>
++  const std::shared_ptr<T> data() const {
++    return std::static_pointer_cast<T>(raw_data());
++  }
++  template <typename T>
++  std::shared_ptr<T> data() {
++    return std::static_pointer_cast<T>(raw_mutable_data());
++  }
++  DataFormat data_format() const;
++
++ private:
++  std::shared_ptr<void> raw_data() const;
++  std::shared_ptr<void> raw_mutable_data();
++
++ private:
++  class Impl;
++  std::unique_ptr<Impl> impl_;
++};
++
++class MACE_API MaceEngine {
++ public:
++  explicit MaceEngine(const MaceEngineConfig &config);
++  ~MaceEngine();
++
++  MaceStatus Init(const NetDef *net_def,
++                  const std::vector<std::string> &input_nodes,
++                  const std::vector<std::string> &output_nodes,
++                  const unsigned char *model_data);
++
++  MaceStatus Init(const NetDef *net_def,
++                  const std::vector<std::string> &input_nodes,
++                  const std::vector<std::string> &output_nodes,
++                  const std::string &model_data_file);
++
++  MaceStatus Run(const std::map<std::string, MaceTensor> &inputs,
++                 std::map<std::string, MaceTensor> *outputs);
++
++  MaceStatus Run(const std::map<std::string, MaceTensor> &inputs,
++                 std::map<std::string, MaceTensor> *outputs,
++                 RunMetadata *run_metadata);
++
++ private:
++  class Impl;
++  std::unique_ptr<Impl> impl_;
++
++  MaceEngine(const MaceEngine &) = delete;
++  MaceEngine &operator=(const MaceEngine &) = delete;
++};
++
++/// \brief Create MaceEngine from model graph proto and weights data
++///
++/// Create MaceEngine object
++///
++/// \param model_graph_proto[in]: the content of model graph proto
++/// \param model_graph_proto_size[in]: the size of model graph proto
++/// \param model_weights_data[in]: the content of model weights data, the
++///                                returned engine will refer to this buffer
++///                                if CPU runtime is used. In this case, the
++///                                buffer should keep alive.
++/// \param model_weights_data_size[in]: the size of model weights data
++/// \param input_nodes[in]: the array of input nodes' name
++/// \param output_nodes[in]: the array of output nodes' name
++/// \param config[in]: configurations for MaceEngine.
++/// \param engine[out]: output MaceEngine object
++/// \return MaceStatus::MACE_SUCCESS for success,
++///         MaceStatus::MACE_INVALID_ARGS for wrong arguments,
++///         MaceStatus::MACE_OUT_OF_RESOURCES for resources is out of range.
++MACE_API MaceStatus CreateMaceEngineFromProto(
++    const unsigned char *model_graph_proto,
++    const size_t model_graph_proto_size,
++    const unsigned char *model_weights_data,
++    const size_t model_weights_data_size,
++    const std::vector<std::string> &input_nodes,
++    const std::vector<std::string> &output_nodes,
++    const MaceEngineConfig &config,
++    std::shared_ptr<MaceEngine> *engine);
++
++/// \brief Create MaceEngine from files (model file + data file)
++/// Deprecated, will be removed in future version
++///
++/// Create MaceEngine object
++///
++/// \param model_pb[in]: the content of model graph file
++/// \param model_data_file[in]: the path of model data file
++/// \param input_nodes[in]: the array of input nodes' name
++/// \param output_nodes[in]: the array of output nodes' name
++/// \param config[in]: configurations for MaceEngine.
++/// \param engine[out]: output MaceEngine object
++/// \return MaceStatus::MACE_SUCCESS for success,
++///         MaceStatus::MACE_INVALID_ARGS for wrong arguments,
++///         MaceStatus::MACE_OUT_OF_RESOURCES for resources is out of range.
++MACE_API MaceStatus CreateMaceEngineFromProto(
++    const std::vector<unsigned char> &model_pb,
++    const std::string &model_data_file,
++    const std::vector<std::string> &input_nodes,
++    const std::vector<std::string> &output_nodes,
++    const MaceEngineConfig &config,
++    std::shared_ptr<MaceEngine> *engine) MACE_DEPRECATED;
++
++
++}  // namespace mace
++
++#endif  // MACE_PUBLIC_MACE_H_
+diff --git a/tools/libmace/include/mace/utils/logging.h b/tools/libmace/include/mace/utils/logging.h
+new file mode 100644
+index 0000000..57fddc9
+--- /dev/null
++++ b/tools/libmace/include/mace/utils/logging.h
+@@ -0,0 +1,139 @@
++// Copyright 2019 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_UTILS_LOGGING_H_
++#define MACE_UTILS_LOGGING_H_
++
++#include <limits>
++#include <memory>
++#include <sstream>
++#include <string>
++#include <vector>
++#include <utility>
++
++#include "mace/port/env.h"
++#include "mace/port/logger.h"
++#include "mace/utils/macros.h"
++#include "mace/utils/memory.h"
++#include "mace/utils/string_util.h"
++
++
++namespace mace {
++namespace logging_internal {
++
++#define LOG(severity) \
++  ::mace::port::Logger(__FILE__, __LINE__, mace::severity)
++
++#define LOG_PTR(severity) \
++  make_unique<mace::port::Logger>(__FILE__, __LINE__, mace::severity)
++
++#define VLOG_IS_ON(vll) (mace::ShouldGenerateVLogMessage(vll))
++#define VLOG(vll) if (VLOG_IS_ON(vll)) LOG(INFO)
++
++// MACE_CHECK/MACE_ASSERT dies with a fatal error if condition is not true.
++// MACE_ASSERT is controlled by NDEBUG ('-c opt' for bazel) while MACE_CHECK
++// will be executed regardless of compilation mode.
++// Therefore, it is safe to do things like:
++//    MACE_CHECK(fp->Write(x) == 4)
++//    MACE_CHECK(fp->Write(x) == 4, "Write failed")
++// which are not safe for MACE_ASSERT.
++#define MACE_CHECK(condition, ...) \
++  if (!(condition)) \
++  LOG(FATAL) << "Check failed: " #condition " " << mace::MakeString(__VA_ARGS__)
++
++#ifndef NDEBUG
++#define MACE_ASSERT(condition, ...) \
++  if (!(condition)) \
++  LOG(FATAL) << "Assert failed: " #condition " " \
++             << mace::MakeString(__VA_ARGS__)
++#else
++#define MACE_ASSERT(condition, ...) ((void)0)
++#endif
++
++template <typename T>
++T &&CheckNotNull(const char *file, int line, const char *exprtext, T &&t) {
++  if (t == nullptr) {
++    ::mace::port::Logger(file, line, FATAL) << std::string(exprtext);
++  }
++  return std::forward<T>(t);
++}
++
++#define MACE_CHECK_NOTNULL(val) \
++  ::mace::logging_internal::CheckNotNull(__FILE__, __LINE__, \
++                                         "'" #val "' Must not be NULL", (val))
++
++#define MACE_NOT_IMPLEMENTED MACE_CHECK(false, "not implemented")
++
++#define MACE_CHECK_SUCCESS(stmt)                             \
++  {                                                          \
++    MaceStatus status = (stmt);                              \
++    if (status != MaceStatus::MACE_SUCCESS) {                \
++      LOG(FATAL) << #stmt << " failed with error: "          \
++              << status.information();                       \
++    }                                                        \
++  }
++
++#define MACE_RETURN_IF_ERROR(stmt)                           \
++  {                                                          \
++    MaceStatus status = (stmt);                              \
++    if (status != MaceStatus::MACE_SUCCESS) {                \
++      VLOG(0) << #stmt << " failed with error: "             \
++              << status.information();                       \
++      return status;                                         \
++    }                                                        \
++  }
++
++class LatencyLogger {
++ public:
++  LatencyLogger(int vlog_level, const std::string &message)
++      : vlog_level_(vlog_level), message_(message) {
++    if (VLOG_IS_ON(vlog_level_)) {
++      start_micros_ = NowMicros();
++      VLOG(vlog_level_) << message_ << " started";
++    }
++  }
++  ~LatencyLogger() {
++    if (VLOG_IS_ON(vlog_level_)) {
++      int64_t stop_micros = NowMicros();
++      VLOG(vlog_level_) << message_
++                        << " latency: " << stop_micros - start_micros_ << " us";
++    }
++  }
++
++ private:
++  const int vlog_level_;
++  const std::string message_;
++  int64_t start_micros_;
++
++  MACE_DISABLE_COPY_AND_ASSIGN(LatencyLogger);
++};
++
++#define MACE_LATENCY_LOGGER(vlog_level, ...)                                  \
++  mace::logging_internal::LatencyLogger latency_logger_##__line__(            \
++      vlog_level, VLOG_IS_ON(vlog_level) ? mace::MakeString(__VA_ARGS__) : "")
++
++
++#ifdef MACE_ENABLE_MALLOC_LOGGING
++#define MACE_MEMORY_LOGGING_GUARD()                                      \
++  auto malloc_logger_##__line__ = port::Env::Default()->NewMallocLogger( \
++      ::mace::port::Logger(__FILE__, __LINE__, mace::INFO), \
++      std::string(__FILE__) + ":" + std::string(__func__));
++#else
++#define MACE_MEMORY_LOGGING_GUARD()
++#endif
++
++}  // namespace logging_internal
++}  // namespace mace
++
++#endif  // MACE_UTILS_LOGGING_H_
+diff --git a/tools/libmace/include/mace/utils/macros.h b/tools/libmace/include/mace/utils/macros.h
+new file mode 100644
+index 0000000..1ce3818
+--- /dev/null
++++ b/tools/libmace/include/mace/utils/macros.h
+@@ -0,0 +1,51 @@
++// Copyright 2019 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_UTILS_MACROS_H_
++#define MACE_UTILS_MACROS_H_
++
++namespace mace {
++
++// Disable the copy and assignment operator for a class.
++#ifndef MACE_DISABLE_COPY_AND_ASSIGN
++#define MACE_DISABLE_COPY_AND_ASSIGN(CLASSNAME)     \
++  CLASSNAME(const CLASSNAME &) = delete;            \
++  CLASSNAME &operator=(const CLASSNAME &) = delete;
++#endif
++
++#ifndef MACE_EMPTY_VIRTUAL_DESTRUCTOR
++#define MACE_EMPTY_VIRTUAL_DESTRUCTOR(CLASSNAME) \
++ public:                                         \
++  virtual ~CLASSNAME() {}
++#endif
++
++#define MACE_UNUSED(var) (void)(var)
++
++#define MACE_COMPUTE_KERNEL_SOURCE(...) #__VA_ARGS__
++
++// GCC can be told that a certain branch is not likely to be taken (for
++// instance, a CHECK failure), and use that information in static analysis.
++// Giving it this information can help it optimize for the common case in
++// the absence of better information (ie. -fprofile-arcs).
++#if defined(COMPILER_GCC3)
++#define MACE_PREDICT_FALSE(x) (__builtin_expect(x, 0))
++#define MACE_PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
++#else
++#define MACE_PREDICT_FALSE(x) (x)
++#define MACE_PREDICT_TRUE(x) (x)
++#endif
++
++}  // namespace mace
++
++#endif  // MACE_UTILS_MACROS_H_
+diff --git a/tools/libmace/include/mace/utils/memory.h b/tools/libmace/include/mace/utils/memory.h
+new file mode 100644
+index 0000000..41a898e
+--- /dev/null
++++ b/tools/libmace/include/mace/utils/memory.h
+@@ -0,0 +1,74 @@
++// Copyright 2018 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_UTILS_MEMORY_H_
++#define MACE_UTILS_MEMORY_H_
++
++#include <memory>
++#include <utility>
++
++namespace mace {
++
++namespace memory_internal {
++
++// Traits to select proper overload and return type for `make_unique<>`.
++template <typename T>
++struct MakeUniqueResult {
++  using scalar = std::unique_ptr<T>;
++};
++template <typename T>
++struct MakeUniqueResult<T[]> {
++  using array = std::unique_ptr<T[]>;
++};
++template <typename T, size_t N>
++struct MakeUniqueResult<T[N]> {
++  using invalid = void;
++};
++
++}  // namespace memory_internal
++
++// gcc 4.8 has __cplusplus at 201301 but doesn't define make_unique.  Other
++// supported compilers either just define __cplusplus as 201103 but have
++// make_unique (msvc), or have make_unique whenever __cplusplus > 201103 (clang)
++#if (__cplusplus > 201103L || defined(_MSC_VER)) && \
++    !(defined(__GNUC__) && __GNUC__ == 4 && __GNUC_MINOR__ == 8)
++using std::make_unique;
++#else
++
++// `make_unique` overload for non-array types.
++template <typename T, typename... Args>
++typename memory_internal::MakeUniqueResult<T>::scalar make_unique(
++    Args&&... args) {
++  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
++}
++
++// `make_unique` overload for an array T[] of unknown bounds.
++// The array allocation needs to use the `new T[size]` form and cannot take
++// element constructor arguments. The `std::unique_ptr` will manage destructing
++// these array elements.
++template <typename T>
++typename memory_internal::MakeUniqueResult<T>::array make_unique(size_t n) {
++  return std::unique_ptr<T>(new typename std::remove_extent<T>::type[n]());
++}
++
++// `make_unique` overload for an array T[N] of known bounds.
++// This construction will be rejected.
++template <typename T, typename... Args>
++typename memory_internal::MakeUniqueResult<T>::invalid make_unique(
++    Args&&... /* args */) = delete;
++#endif
++
++}  // namespace mace
++
++#endif  // MACE_UTILS_MEMORY_H_
+diff --git a/tools/libmace/include/mace/utils/string_util.h b/tools/libmace/include/mace/utils/string_util.h
+new file mode 100644
+index 0000000..c9df135
+--- /dev/null
++++ b/tools/libmace/include/mace/utils/string_util.h
+@@ -0,0 +1,115 @@
++// Copyright 2018 The MACE Authors. All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef MACE_UTILS_STRING_UTIL_H_
++#define MACE_UTILS_STRING_UTIL_H_
++
++#include <algorithm>
++#include <sstream>
++#include <string>
++#include <vector>
++
++namespace mace {
++namespace string_util {
++
++inline void MakeStringInternal(std::stringstream & /*ss*/) {}
++
++template <typename T>
++inline void MakeStringInternal(std::stringstream &ss, const T &t) {
++  ss << t;
++}
++
++template <typename T, typename... Args>
++inline void MakeStringInternal(std::stringstream &ss,
++                               const T &t,
++                               const Args &... args) {
++  MakeStringInternal(ss, t);
++  MakeStringInternal(ss, args...);
++}
++
++class StringFormatter {
++ public:
++  static std::string Table(const std::string &title,
++                           const std::vector<std::string> &header,
++                           const std::vector<std::vector<std::string>> &data);
++};
++
++}  // namespace string_util
++
++template <typename... Args>
++std::string MakeString(const Args &... args) {
++  std::stringstream ss;
++  string_util::MakeStringInternal(ss, args...);
++  return ss.str();
++}
++
++template <typename T>
++std::string MakeListString(const T *args, size_t size) {
++  std::stringstream ss;
++  ss << "[";
++  for (size_t i = 0; i < size; ++i) {
++    ss << args[i];
++    if (i < size - 1) {
++      ss << ", ";
++    }
++  }
++  ss << "]";
++  return ss.str();
++}
++
++template <typename T>
++std::string MakeString(const std::vector<T> &args) {
++  return MakeListString(args.data(), args.size());
++}
++
++// Specializations for already-a-string types.
++template <>
++inline std::string MakeString(const std::string &str) {
++  return str;
++}
++
++inline std::string MakeString(const char *c_str) { return std::string(c_str); }
++
++inline std::string ToLower(const std::string &src) {
++  std::string dest(src);
++  std::transform(src.begin(), src.end(), dest.begin(), ::tolower);
++  return dest;
++}
++
++inline std::string ToUpper(const std::string &src) {
++  std::string dest(src);
++  std::transform(src.begin(), src.end(), dest.begin(), ::toupper);
++  return dest;
++}
++
++std::string ObfuscateString(const std::string &src,
++                            const std::string &lookup_table);
++
++std::string ObfuscateString(const std::string &src);
++
++std::string ObfuscateSymbol(const std::string &src);
++
++#ifdef MACE_OBFUSCATE_LITERALS
++#define MACE_OBFUSCATE_STRING(str) ObfuscateString(str)
++#define MACE_OBFUSCATE_SYMBOL(str) ObfuscateSymbol(str)
++#else
++#define MACE_OBFUSCATE_STRING(str) (str)
++#define MACE_OBFUSCATE_SYMBOL(str) (str)
++#endif
++
++std::vector<std::string> Split(const std::string &str, char delims);
++
++}  // namespace mace
++
++#endif  // MACE_UTILS_STRING_UTIL_H_
