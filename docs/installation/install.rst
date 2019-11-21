@@ -4,7 +4,7 @@ How to install
 Build MACE-Kit
 ---------------
 
-MACE-Kit supports linux and android build using CMake. Take android build for
+MACE-Kit supports android build using CMake. Take android build for
 example, execute
 
     .. code:: sh
