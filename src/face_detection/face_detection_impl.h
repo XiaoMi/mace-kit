@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_SRC_FACE_DETECTION_IMPL_H_
-#define MACEKIT_SRC_FACE_DETECTION_IMPL_H_
+#ifndef SRC_FACE_DETECTION_FACE_DETECTION_IMPL_H_
+#define SRC_FACE_DETECTION_FACE_DETECTION_IMPL_H_
+
+#include<map>
+#include<memory>
+#include<string>
 
 #include "macekit/face_detection.h"
 #include "mace/public/mace.h"
@@ -23,14 +27,11 @@ namespace mace_kit {
 
 class FaceDetectionImpl : public FaceDetection {
  public:
-  FaceDetectionImpl(const FaceDetectionContext &context);
-
+  explicit FaceDetectionImpl(const FaceDetectionContext &context);
   FaceDetectionImpl(const FaceDetectionImpl&) = delete;
   FaceDetectionImpl& operator=(const FaceDetectionImpl&) = delete;
-
   ~FaceDetectionImpl() override = default;
-
-  Status Detect(Mat &mat, int max_face_count, FaceResult *result) override;
+  Status Detect(Mat *mat, int max_face_count, FaceResult *result) override;
 
  private:
   std::shared_ptr<mace::MaceEngine> mace_engine_;
@@ -41,4 +42,4 @@ class FaceDetectionImpl : public FaceDetection {
 
 }  // namespace mace_kit
 
-#endif  // MACEKIT_SRC_FACE_DETECTION_IMPL_H_
+#endif  // SRC_FACE_DETECTION_FACE_DETECTION_IMPL_H_

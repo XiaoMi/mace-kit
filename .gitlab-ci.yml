@@ -1,0 +1,19 @@
+stages:
+  - linting
+  - build
+  - test
+
+cpplint:
+  stage: linting
+  script:
+    - sh tool/cpplint.sh
+
+build:
+  stage: build
+  script:
+    - bash tool/cmake-build-android-armeabi-v7a.sh
+
+test:
+  stage: test
+  script:
+    - bash tool/cctest.sh

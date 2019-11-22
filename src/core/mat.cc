@@ -15,8 +15,8 @@
 #include "macekit/mat.h"
 
 #include <assert.h>
-#include <numeric>
 #include <malloc.h>
+#include <numeric>
 #include <memory>
 #include <cstring>
 
@@ -91,9 +91,10 @@ void Mat::Create(const std::vector<int> &shape, int data_type) {
   if (size > 0) {
     u_char  *data = nullptr;
     if (DataTypeToEnum<float>::value == data_type) {
-      data = (u_char *) memalign(kMemoryAlignment, size * sizeof(float));
+      data = reinterpret_cast<u_char *>(memalign(kMemoryAlignment,
+          size * sizeof(float)));
     } else if (DataTypeToEnum<uint8_t>::value == data_type) {
-      data = (u_char *) memalign(kMemoryAlignment, size);
+      data = reinterpret_cast<u_char *>(memalign(kMemoryAlignment, size));
     } else {
       assert(false);
     }
@@ -104,15 +105,15 @@ void Mat::Create(const std::vector<int> &shape, int data_type) {
   }
 }
 
-void Mat::CopyTo(Mat &mat) const {
-  assert(mat.shape_ == shape_);
-  assert(mat.data_ != nullptr);
+void Mat::CopyTo(Mat *mat) const {
+  assert(mat->shape_ == shape_);
+  assert(mat->data_ != nullptr);
   int size =
       std::accumulate(shape_.begin(), shape_.end(), 1, std::multiplies<int>());
   if (DataTypeToEnum<float>::value == data_type_) {
-    memcpy(mat.data_, data_, sizeof(float) * size);
+    memcpy(mat->data_, data_, sizeof(float) * size);
   } else if (DataTypeToEnum<uint8_t>::value == data_type_) {
-    memcpy(mat.data_, data_, size);
+    memcpy(mat->data_, data_, size);
   } else {
     assert(false);
   }
@@ -120,7 +121,7 @@ void Mat::CopyTo(Mat &mat) const {
 
 Mat Mat::Clone() const {
   Mat mat(shape_, data_type_, FM_RGB);
-  CopyTo(mat);
+  CopyTo(&mat);
   return mat;
 }
 

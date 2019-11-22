@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_INCLUDE_TYPE_H_
-#define MACEKIT_INCLUDE_TYPE_H_
+#ifndef INCLUDE_MACEKIT_TYPE_H_
+#define INCLUDE_MACEKIT_TYPE_H_
 
 namespace mace_kit {
 
@@ -29,4 +29,4 @@ enum CPUAffinityPolicy {
 
 }  // namespace mace_kit
 
-#endif  // MACEKIT_INCLUDE_TYPE_H_
+#endif  // INCLUDE_MACEKIT_TYPE_H_

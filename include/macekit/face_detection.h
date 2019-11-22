@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_INCLUDE_FACE_DETECTION_H_
-#define MACEKIT_INCLUDE_FACE_DETECTION_H_
+#ifndef INCLUDE_MACEKIT_FACE_DETECTION_H_
+#define INCLUDE_MACEKIT_FACE_DETECTION_H_
 
 #include <vector>
 #include <map>
@@ -48,9 +48,9 @@ class MACEKIT_EXPORT FaceDetection {
 
   virtual ~FaceDetection() = default;
 
-  virtual Status Detect(Mat &mat, int max_face_count, FaceResult *result) = 0;
+  virtual Status Detect(Mat *mat, int max_face_count, FaceResult *result) = 0;
 };
 
 }  // namespace mace_kit
 
-#endif  // MACEKIT_INCLUDE_FACE_DETECTION_H_
+#endif  // INCLUDE_MACEKIT_FACE_DETECTION_H_

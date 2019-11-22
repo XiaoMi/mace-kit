@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_FACE_RECOGNITION_H_
-#define MACEKIT_FACE_RECOGNITION_H_
+#ifndef INCLUDE_MACEKIT_FACE_RECOGNITION_H_
+#define INCLUDE_MACEKIT_FACE_RECOGNITION_H_
 
 #include <vector>
 #include <map>
@@ -39,11 +39,11 @@ class MACEKIT_EXPORT FaceRecognition {
 
   virtual ~FaceRecognition() = default;
 
-  virtual Status ComputeEmbedding(Mat &mat, std::vector<float> *embed) = 0;
+  virtual Status ComputeEmbedding(Mat *mat, std::vector<float> *embed) = 0;
 
-  virtual Status Compare(Mat &lhs, Mat &rhs, float *similarity) = 0;
+  virtual Status Compare(Mat *lhs, Mat *rhs, float *similarity) = 0;
 };
 
 }  // namespace mace_kit
 
-#endif  // MACEKIT_FACE_RECOGNITION_H_
+#endif  // INCLUDE_MACEKIT_FACE_RECOGNITION_H_

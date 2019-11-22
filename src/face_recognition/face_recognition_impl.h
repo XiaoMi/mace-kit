@@ -12,8 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_SRC_FACE_RECOGNITION_IMPL_H_
-#define MACEKIT_SRC_FACE_RECOGNITION_IMPL_H_
+#ifndef SRC_FACE_RECOGNITION_FACE_RECOGNITION_IMPL_H_
+#define SRC_FACE_RECOGNITION_FACE_RECOGNITION_IMPL_H_
+
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "macekit/face_recognition.h"
 #include "mace/public/mace.h"
@@ -22,16 +27,16 @@ namespace mace_kit {
 
 class FaceRecognitionImpl : public FaceRecognition {
  public:
-  FaceRecognitionImpl(const FaceRecognitionContext &context);
+  explicit FaceRecognitionImpl(const FaceRecognitionContext &context);
 
   FaceRecognitionImpl(const FaceRecognitionImpl&) = delete;
   FaceRecognitionImpl& operator=(const FaceRecognitionImpl&) = delete;
 
   ~FaceRecognitionImpl() override = default;
 
-  Status ComputeEmbedding(Mat &mat, std::vector<float> *embed) override;
+  Status ComputeEmbedding(Mat *mat, std::vector<float> *embed) override;
 
-  Status Compare(Mat &lhs, Mat &rhs, float *similarity) override;
+  Status Compare(Mat *lhs, Mat *rhs, float *similarity) override;
 
  private:
   std::shared_ptr<mace::MaceEngine> mace_engine_;
@@ -41,4 +46,4 @@ class FaceRecognitionImpl : public FaceRecognition {
 
 }  // namespace mace_kit
 
-#endif  // MACEKIT_SRC_FACE_RECOGNITION_IMPL_H_
+#endif  // SRC_FACE_RECOGNITION_FACE_RECOGNITION_IMPL_H_

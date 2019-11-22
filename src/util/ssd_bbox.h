@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_INCLUDE_SSD_BBOX_H_
-#define MACEKIT_INCLUDE_SSD_BBOX_H_
+#ifndef SRC_UTIL_SSD_BBOX_H_
+#define SRC_UTIL_SSD_BBOX_H_
 
 #include <cstdint>
 #include <vector>
@@ -103,4 +103,4 @@ class SSDBbox {
 }  // namespace util
 }  // namespace mace_kit
 
-#endif  // MACEKIT_INCLUDE_SSD_BBOX_H_
+#endif  // SRC_UTIL_SSD_BBOX_H_

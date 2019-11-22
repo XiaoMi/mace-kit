@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_CONTEXT_H_
-#define MACEKIT_CONTEXT_H_
+#ifndef INCLUDE_MACEKIT_CONTEXT_H_
+#define INCLUDE_MACEKIT_CONTEXT_H_
 
 namespace mace_kit {
 
@@ -25,4 +25,4 @@ struct MACEKIT_EXPORT Context {
 
 }
 
-#endif  // MACEKIT_CONTEXT_H_
+#endif  // INCLUDE_MACEKIT_CONTEXT_H_

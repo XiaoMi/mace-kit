@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_INCLUDE_MAT_H_
-#define MACEKIT_INCLUDE_MAT_H_
+#ifndef INCLUDE_MACEKIT_MAT_H_
+#define INCLUDE_MACEKIT_MAT_H_
 
 #include <vector>
 #include <memory>
@@ -59,7 +59,7 @@ class MACEKIT_EXPORT Mat {
 
   void Create(const std::vector<int> &shape, int data_type);
 
-  void CopyTo(Mat &mat) const;
+  void CopyTo(Mat *mat) const;
 
   Mat Clone() const;
 
@@ -76,4 +76,4 @@ class MACEKIT_EXPORT Mat {
 
 }  // namespace mace_kit
 
-#endif  // MACEKIT_INCLUDE_MAT_H_
+#endif  // INCLUDE_MACEKIT_MAT_H_

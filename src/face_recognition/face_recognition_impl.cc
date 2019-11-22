@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "src/face_recognition/face_recognition_impl.h"
-
 #include <iostream>
 #include <string>
 #include <vector>
 #include <numeric>
 #include <cmath>
+
+#include "src/face_recognition/face_recognition_impl.h"
 #include "src/face_recognition/model/include/mace_engine_factory.h"
 
 namespace mace_kit {
@@ -42,7 +42,8 @@ const int embeding_size = 128;
 }  // namespace
 
 
-FaceRecognitionImpl::FaceRecognitionImpl(const FaceRecognitionContext &context) {
+FaceRecognitionImpl::FaceRecognitionImpl(
+    const FaceRecognitionContext &context) {
   mace::MaceStatus status;
   mace::MaceEngineConfig
       config(static_cast<mace::DeviceType>(context.device_type));
@@ -68,7 +69,8 @@ FaceRecognitionImpl::FaceRecognitionImpl(const FaceRecognitionContext &context) 
     config.SetGPUContext(gpu_context);
     config.SetGPUHints(
         static_cast<mace::GPUPerfHint>(mace::GPUPerfHint::PERF_NORMAL),
-        static_cast<mace::GPUPriorityHint>(mace::GPUPriorityHint::PRIORITY_LOW));
+        static_cast<mace::GPUPriorityHint>(
+            mace::GPUPriorityHint::PRIORITY_LOW));
   }
 #endif  // MACEKIT_ENABLE_OPENCL
 
@@ -89,10 +91,10 @@ FaceRecognitionImpl::FaceRecognitionImpl(const FaceRecognitionContext &context) 
       mace::MaceTensor({embeding_size}, buffer_out);
 }
 
-Status FaceRecognitionImpl::ComputeEmbedding(Mat &mat,
+Status FaceRecognitionImpl::ComputeEmbedding(Mat *mat,
                                              std::vector<float> *embed) {
   std::vector<int64_t>
-      input_shape{1, mat.shape()[0], mat.shape()[1], mat.shape()[2]};
+      input_shape{1, mat->shape()[0], mat->shape()[1], mat->shape()[2]};
 
   // RGB -> substract mean
   int idx = 0;
@@ -100,7 +102,7 @@ Status FaceRecognitionImpl::ComputeEmbedding(Mat &mat,
     for (int w = 0; w < img_shape[1]; w++) {
       for (int c = 0; c < 3; c++) {
         mace_input_buffer_.get()[idx] =
-            mat.data<float>()[idx] / 127.5f - 1.f;
+            mat->data<float>()[idx] / 127.5f - 1.f;
 
         idx++;
       }
@@ -122,8 +124,8 @@ Status FaceRecognitionImpl::ComputeEmbedding(Mat &mat,
   return Status::OK();
 }
 
-Status FaceRecognitionImpl::Compare(Mat &lhs,
-                                    Mat &rhs,
+Status FaceRecognitionImpl::Compare(Mat *lhs,
+                                    Mat *rhs,
                                     float *similarity) {
   std::vector<float> lhs_embed, rhs_embed;
   ComputeEmbedding(lhs, &lhs_embed);
