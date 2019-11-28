@@ -14,3 +14,5 @@ The algorithms we have already integrated are listed as follows:
 * Face Recognition
 
 * Automatic Speech Recognition
+
+* Object Detection

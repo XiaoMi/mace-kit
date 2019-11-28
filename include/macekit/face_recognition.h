@@ -42,7 +42,6 @@ class MACEKIT_EXPORT FaceRecognition {
   virtual Status ComputeEmbedding(Mat *mat, std::vector<float> *embed) = 0;
 
   virtual Status Compare(Mat *lhs, Mat *rhs, float *similarity) = 0;
-
 };
 
 }  // namespace mace_kit
