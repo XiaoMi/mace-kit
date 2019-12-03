@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_INCLUDE_EXPORT_H_
-#define MACEKIT_INCLUDE_EXPORT_H_
+#ifndef INCLUDE_MACEKIT_EXPORT_H_
+#define INCLUDE_MACEKIT_EXPORT_H_
 
 #ifndef MACEKIT_EXPORT
 #ifdef _MSC_VER
@@ -23,4 +23,4 @@
 #endif
 #endif
 
-#endif  // MACEKIT_INCLUDE_EXPORT_H_
+#endif  // INCLUDE_MACEKIT_EXPORT_H_

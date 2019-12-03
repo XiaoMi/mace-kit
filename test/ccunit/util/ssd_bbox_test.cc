@@ -43,7 +43,6 @@ TEST_F(SSDBboxTest, TestGetAnchorShape) {
     EXPECT_NEAR(expected_anchor_shapes[i][0], anchor_shapes[i][0], 1e-3);
     EXPECT_NEAR(expected_anchor_shapes[i][1], anchor_shapes[i][1], 1e-3);
   }
-
 }
 
 TEST_F(SSDBboxTest, TestNMS) {
@@ -83,4 +82,4 @@ TEST_F(SSDBboxTest, TestNMS) {
 }
 
 }  // namespace util
-}  // mace_kit
+}  // namespace mace_kit

@@ -83,11 +83,11 @@ TEST_F(FaceDetectionTest, TestDetect) {
   ImgToMat(img, &input);
 
   FaceResult result;
-  Status status = face_detection_->Detect(input, 50, &result);
+  Status status = face_detection_->Detect(&input, 50, &result);
   EXPECT_TRUE(status.ok());
 
   DrawAnchor(img, result);
   cv::imwrite("test_out.png", img);
 }
 
-}  // mace_kit
+}  // namespace mace_kit

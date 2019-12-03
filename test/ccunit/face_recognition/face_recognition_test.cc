@@ -63,7 +63,7 @@ namespace {
     }
     std::cout << std::endl;
   }
-}
+}  // namespace
 
 TEST_F(FaceRecognitionTest, TestComputeEmbedding) {
   ::testing::internal::LogToStderr();
@@ -71,14 +71,14 @@ TEST_F(FaceRecognitionTest, TestComputeEmbedding) {
   ImgToMat("data/test/Anthony_Hopkins_0001.jpg", &input1);
   std::vector<float> embed1;
 
-  Status status1 = face_recognition_->ComputeEmbedding(input1, &embed1);
+  Status status1 = face_recognition_->ComputeEmbedding(&input1, &embed1);
   EXPECT_TRUE(status1.ok());
   PrintEmbedding(embed1);
 
   Mat input2;
   ImgToMat("data/test/Anthony_Hopkins_0002.jpg", &input2);
   std::vector<float> embed2;
-  Status status2 = face_recognition_->ComputeEmbedding(input2, &embed2);
+  Status status2 = face_recognition_->ComputeEmbedding(&input2, &embed2);
   EXPECT_TRUE(status2.ok());
   PrintEmbedding(embed2);
 }
@@ -89,9 +89,9 @@ TEST_F(FaceRecognitionTest, TestCompare) {
   ImgToMat("data/test/Anthony_Hopkins_0001.jpg", &input1);
   ImgToMat("data/test/Anthony_Hopkins_0002.jpg", &input2);
   float similarity = 0.f;
-  Status status = face_recognition_->Compare(input1, input2, &similarity);
+  Status status = face_recognition_->Compare(&input1, &input2, &similarity);
   EXPECT_TRUE(status.ok() && similarity > 0.5);
   std::cout << "Similarity : " << similarity << std::endl;
 }
 
-}  // mace_kit
+}  // namespace mace_kit

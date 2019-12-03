@@ -13,20 +13,20 @@
 // limitations under the License.
 
 #include <assert.h>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <functional>
+#include <utility>
+
 #include "src/util/ssd_bbox.h"
 
 namespace mace_kit {
 namespace util {
 
 SSDBbox::SSDBbox() {
-
 }
 
 SSDBbox::~SSDBbox() {
-
 }
 
 void SSDBbox::Decode(const float *feature_localizations,
@@ -163,3 +163,4 @@ float SSDBbox::CalJaccard(const float *lhs, const float *rhs) {
 
 }  // namespace util
 }  // namespace mace_kit
+

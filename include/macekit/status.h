@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MACEKIT_INCLUDE_STATUS_H_
-#define MACEKIT_INCLUDE_STATUS_H_
+#ifndef INCLUDE_MACEKIT_STATUS_H_
+#define INCLUDE_MACEKIT_STATUS_H_
 
-#include "macekit/export.h"
 #include <string>
+#include "macekit/export.h"
 
 namespace mace_kit {
 
@@ -75,4 +75,4 @@ class MACEKIT_EXPORT Status {
 
 }  // namespace mace_kit
 
-#endif  // MACEKIT_INCLUDE_STATUS_H_
+#endif  // INCLUDE_MACEKIT_STATUS_H_

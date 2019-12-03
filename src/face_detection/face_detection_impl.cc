@@ -15,10 +15,13 @@
 #include "src/face_detection/face_detection_impl.h"
 
 #include <iostream>
+#include <functional>
 #include <string>
 #include <vector>
 #include <numeric>
 #include <cmath>
+#include <map>
+#include <memory>
 
 #include "src/face_detection/model/include/mace_engine_factory.h"
 
@@ -123,7 +126,8 @@ FaceDetectionImpl::FaceDetectionImpl(const FaceDetectionContext &context) {
     config.SetGPUContext(gpu_context);
     config.SetGPUHints(
         static_cast<mace::GPUPerfHint>(mace::GPUPerfHint::PERF_NORMAL),
-        static_cast<mace::GPUPriorityHint>(mace::GPUPriorityHint::PRIORITY_LOW));
+        static_cast<mace::GPUPriorityHint>(
+            mace::GPUPriorityHint::PRIORITY_LOW));
   }
 #endif  // MACEKIT_ENABLE_OPENCL
 
@@ -154,29 +158,31 @@ FaceDetectionImpl::FaceDetectionImpl(const FaceDetectionContext &context) {
         std::accumulate(loc_output_shape.begin(), loc_output_shape.end(), 1,
                         std::multiplies<int64_t>());
 
-    auto cls_buffer_out = std::shared_ptr<float>(new float[cls_output_size],
-                                                 std::default_delete<float[]>());
+    auto cls_buffer_out =
+        std::shared_ptr<float>(new float[cls_output_size],
+                               std::default_delete<float[]>());
     mace_output_tensors_[mace_output_nodes[i]] =
         mace::MaceTensor({cls_output_shape, cls_buffer_out});
-    auto loc_buffer_out = std::shared_ptr<float>(new float[loc_output_size],
-                                                 std::default_delete<float[]>());
+    auto loc_buffer_out =
+        std::shared_ptr<float>(
+            new float[loc_output_size], std::default_delete<float[]>());
     mace_output_tensors_[mace_output_nodes[i + feature_shapes.size()]] =
         mace::MaceTensor({loc_output_shape, loc_buffer_out});
   }
 }
 
-Status FaceDetectionImpl::Detect(Mat &mat,
+Status FaceDetectionImpl::Detect(Mat *mat,
                                  int max_face_count,
                                  FaceResult *result) {
   std::vector<int64_t>
-      input_shape{1, mat.shape()[0], mat.shape()[1], mat.shape()[2]};
+      input_shape{1, mat->shape()[0], mat->shape()[1], mat->shape()[2]};
 
   // RGB -> substract mean
   int idx = 0;
   for (int h = 0; h < img_shape[0]; h++) {
     for (int w = 0; w < img_shape[1]; w++) {
       for (int c = 0; c < 3; c++) {
-        mace_input_buffer_.get()[idx] = mat.data<float>()[idx] - means[c];
+        mace_input_buffer_.get()[idx] = mat->data<float>()[idx] - means[c];
         idx++;
       }
     }
