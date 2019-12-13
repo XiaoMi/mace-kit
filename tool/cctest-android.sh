@@ -22,4 +22,5 @@ for serialno in ${array[@]}; do
     adb -s $serialno shell "cd /data/local/tmp/macekit; LD_LIBRARY_PATH=lib ./bin/face_detection_unitest"
     adb -s $serialno shell "cd /data/local/tmp/macekit; LD_LIBRARY_PATH=lib ./bin/face_recognition_unitest"
     adb -s $serialno shell "cd /data/local/tmp/macekit; LD_LIBRARY_PATH=lib ./bin/speech_recognition_unitest"
+    adb -s $serialno shell "cd /data/local/tmp/macekit; LD_LIBRARY_PATH=lib ./bin/object_detection_unitest"
 done

@@ -9,6 +9,7 @@ Feature List
 - [x] Face Detection
 - [x] Face Recognition
 - [x] Speech Recognition
+- [x] Object Detection
 
 How to build
 -------------
