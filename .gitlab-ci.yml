@@ -16,4 +16,4 @@ build:
 test:
   stage: test
   script:
-    - bash tool/cctest.sh
+    - bash tool/cctest-android.sh

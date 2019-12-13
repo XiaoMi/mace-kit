@@ -18,4 +18,4 @@ To run MACE-Kit on android, execute
 
     .. code:: sh
 
-        tool/cctest.sh
+        tool/cctest-android.sh

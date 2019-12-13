@@ -1,0 +1,158 @@
+### original kaldi
+#### test-1.wav
+./online2-wav-nnet3-latgen-faster --do-endpointing=false --online=true --frame-subsampling-factor=3 --config=/home/liutuo/workspace/AI/liutuo/models/asr-demo/asr-tiny/online/conf/online.conf --min-active=200 --max-active=7000 --beam=15.0 --lattice-beam=6.0 --acoustic-scale=1.0 --word-symbol-table=asr-tiny/graph_tiny/words.txt asr-tiny/online/final.mdl asr-tiny/graph_tiny/HCLG.fst 'ark:echo utter1 utter1|' 'scp:echo utter1 /home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/test-1.wav|' ark,t:/home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/1_out.ark
+./online2-wav-nnet3-latgen-faster --do-endpointing=false --online=true --frame-subsampling-factor=3 --config=/home/liutuo/workspace/AI/liutuo/models/asr-demo/asr-tiny/online/conf/online.conf --min-active=200 --max-active=7000 --beam=15.0 --lattice-beam=6.0 --acoustic-scale=1.0 --word-symbol-table=asr-tiny/graph_tiny/words.txt asr-tiny/online/final.mdl asr-tiny/graph_tiny/HCLG.fst 'ark:echo utter1 utter1|' 'scp:echo utter1 /home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/test-1.wav|' ark,t:/home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/1_out.ark 
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:RemoveOrphanNodes():nnet-nnet.cc:948) Removed 1 orphan nodes.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:RemoveOrphanComponents():nnet-nnet.cc:847) Removing 2 orphan components.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Collapse():nnet-utils.cc:1463) Added 1 components, removed 2
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:CompileLooped():nnet-compile-looped.cc:345) Spent 0.0256431 seconds in looped compilation.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:240) chunk length: 2880
+utter1 帮我 打电话给 幺 三 二 七 九 八 四 九 幺 幺 七 
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:296) Decoded utterance utter1
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:36) Timing stats: total taken time was 6.76532 real-time factor was 1.00674 (note: this cannot be less than one.)
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:39) Average delay was 0.045325 seconds.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:43) Percentage of time spent idling was 93.9825
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:45) Longest delay was 0.045325 seconds for utterance 'utter1'
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:302) Decoded 1 utterances, 0 with errors.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:304) Overall likelihood per frame was 1.68021 per frame over 224 frames.
+
+#### test-2.wav
+./online2-wav-nnet3-latgen-faster --do-endpointing=false --online=true --frame-subsampling-factor=3 --config=/home/liutuo/workspace/AI/liutuo/models/asr-demo/asr-tiny/online/conf/online.conf --min-active=200 --max-active=7000 --beam=15.0 --lattice-beam=6.0 --acoustic-scale=1.0 --word-symbol-table=asr-tiny/graph_tiny/words.txt asr-tiny/online/final.mdl asr-tiny/graph_tiny/HCLG.fst 'ark:echo utter1 utter1|' 'scp:echo utter1 /home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/test-2.wav|' ark,t:/home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/2_out.ark
+./online2-wav-nnet3-latgen-faster --do-endpointing=false --online=true --frame-subsampling-factor=3 --config=/home/liutuo/workspace/AI/liutuo/models/asr-demo/asr-tiny/online/conf/online.conf --min-active=200 --max-active=7000 --beam=15.0 --lattice-beam=6.0 --acoustic-scale=1.0 --word-symbol-table=asr-tiny/graph_tiny/words.txt asr-tiny/online/final.mdl asr-tiny/graph_tiny/HCLG.fst 'ark:echo utter1 utter1|' 'scp:echo utter1 /home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/test-2.wav|' ark,t:/home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/2_out.ark 
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:RemoveOrphanNodes():nnet-nnet.cc:948) Removed 1 orphan nodes.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:RemoveOrphanComponents():nnet-nnet.cc:847) Removing 2 orphan components.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Collapse():nnet-utils.cc:1463) Added 1 components, removed 2
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:CompileLooped():nnet-compile-looped.cc:345) Spent 0.025878 seconds in looped compilation.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:240) chunk length: 2880
+utter1 打 给 幺 三 三 二 四 五 幺 二 四 七 八 
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:296) Decoded utterance utter1
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:36) Timing stats: total taken time was 6.44905 real-time factor was 1.00766 (note: this cannot be less than one.)
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:39) Average delay was 0.049047 seconds.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:43) Percentage of time spent idling was 94.1292
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:45) Longest delay was 0.049047 seconds for utterance 'utter1'
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:302) Decoded 1 utterances, 0 with errors.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:304) Overall likelihood per frame was 1.4374 per frame over 213 frames.
+
+./online2-wav-nnet3-latgen-faster --do-endpointing=false --online=true --frame-subsampling-factor=3 --config=/home/liutuo/workspace/AI/liutuo/models/asr-demo/asr-tiny/online/conf/online.conf --min-active=200 --max-active=7000 --beam=15.0 --lattice-beam=6.0 --acoustic-scale=1.0 --word-symbol-table=asr-tiny/graph_tiny/words.txt asr-tiny/online/final.mdl asr-tiny/graph_tiny/HCLG.fst 'ark:echo utter1 utter1|' 'scp:echo utter1 /home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/test-3.wav|' ark,t:/home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/3_out.ark
+./online2-wav-nnet3-latgen-faster --do-endpointing=false --online=true --frame-subsampling-factor=3 --config=/home/liutuo/workspace/AI/liutuo/models/asr-demo/asr-tiny/online/conf/online.conf --min-active=200 --max-active=7000 --beam=15.0 --lattice-beam=6.0 --acoustic-scale=1.0 --word-symbol-table=asr-tiny/graph_tiny/words.txt asr-tiny/online/final.mdl asr-tiny/graph_tiny/HCLG.fst 'ark:echo utter1 utter1|' 'scp:echo utter1 /home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/test-3.wav|' ark,t:/home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/3_out.ark 
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:RemoveOrphanNodes():nnet-nnet.cc:948) Removed 1 orphan nodes.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:RemoveOrphanComponents():nnet-nnet.cc:847) Removing 2 orphan components.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Collapse():nnet-utils.cc:1463) Added 1 components, removed 2
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:CompileLooped():nnet-compile-looped.cc:345) Spent 0.0278881 seconds in looped compilation.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:240) chunk length: 2880
+utter1 拨打电话 幺 房 九 二 五 八 四 六 五 三 
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:296) Decoded utterance utter1
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:36) Timing stats: total taken time was 7.30542 real-time factor was 1.00349 (note: this cannot be less than one.)
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:39) Average delay was 0.025424 seconds.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:43) Percentage of time spent idling was 89.9638
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:45) Longest delay was 0.025424 seconds for utterance 'utter1'
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:302) Decoded 1 utterances, 0 with errors.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:304) Overall likelihood per frame was 1.34538 per frame over 242 frames.
+
+./online2-wav-nnet3-latgen-faster --do-endpointing=false --online=true --frame-subsampling-factor=3 --config=/home/liutuo/workspace/AI/liutuo/models/asr-demo/asr-tiny/online/conf/online.conf --min-active=200 --max-active=7000 --beam=15.0 --lattice-beam=6.0 --acoustic-scale=1.0 --word-symbol-table=asr-tiny/graph_tiny/words.txt asr-tiny/online/final.mdl asr-tiny/graph_tiny/HCLG.fst 'ark:echo utter1 utter1|' 'scp:echo utter1 /home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/test-4.wav|' ark,t:/home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/4_out.ark
+./online2-wav-nnet3-latgen-faster --do-endpointing=false --online=true --frame-subsampling-factor=3 --config=/home/liutuo/workspace/AI/liutuo/models/asr-demo/asr-tiny/online/conf/online.conf --min-active=200 --max-active=7000 --beam=15.0 --lattice-beam=6.0 --acoustic-scale=1.0 --word-symbol-table=asr-tiny/graph_tiny/words.txt asr-tiny/online/final.mdl asr-tiny/graph_tiny/HCLG.fst 'ark:echo utter1 utter1|' 'scp:echo utter1 /home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/test-4.wav|' ark,t:/home/liutuo/workspace/AI/liutuo/mace-kit/src/asr/model/tmp/asr-tiny/test_wav/4_out.ark 
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:RemoveOrphanNodes():nnet-nnet.cc:948) Removed 1 orphan nodes.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:RemoveOrphanComponents():nnet-nnet.cc:847) Removing 2 orphan components.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Collapse():nnet-utils.cc:1463) Added 1 components, removed 2
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:CompileLooped():nnet-compile-looped.cc:345) Spent 0.026233 seconds in looped compilation.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:240) chunk length: 2880
+utter1 帮我 拨打 幺 八六 零 零 七 
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:296) Decoded utterance utter1
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:36) Timing stats: total taken time was 6.35086 real-time factor was 1.03098 (note: this cannot be less than one.)
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:39) Average delay was 0.190864 seconds.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:43) Percentage of time spent idling was 86.3521
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:Print():online-timing.cc:45) Longest delay was 0.190864 seconds for utterance 'utter1'
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:302) Decoded 1 utterances, 0 with errors.
+LOG (online2-wav-nnet3-latgen-faster[5.5.485~10-8d326]:main():online2-wav-nnet3-latgen-faster.cc:304) Overall likelihood per frame was 0.932842 per frame over 205 frames.
+
+
+
+for kaldi-mace android
+
+test-1:
+
+WARNING: linker: ./mace-online-decode: unused DT entry: type 0x1d arg 0xb38
+WARNING: linker: /data/local/tmp/libs/libkaldi-mace.so: unused DT entry: type 0x1d arg 0x1dbd47
+LOG ([5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG ([5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:877] Create MaceEngine from model graph proto and weights data
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:430] Creating MaceEngine, MACE version: v0.11.0-rc0-174-ga7beafb
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:469] Initializing MaceEngine
+utter1 帮我 打电话给 幺 三 二 七 九 八 四 九 幺 幺 七 
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:280) Decoded utterance utter1
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:36) Timing stats: total taken time was 7.5515 real-time factor was 1.12374 (note: this cannot be less than one.)
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:39) Average delay was 0.831504 seconds.
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:43) Percentage of time spent idling was 34.8379
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:45) Longest delay was 0.831504 seconds for utterance 'utter1'
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:286) Decoded 1 utterances, 0 with errors.
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:288) Overall likelihood per frame was 1.6796 per frame over 224 frames.
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:602] Destroying MaceEngine
+
+test-2:
+
+WARNING: linker: ./mace-online-decode: unused DT entry: type 0x1d arg 0xb38
+WARNING: linker: /data/local/tmp/libs/libkaldi-mace.so: unused DT entry: type 0x1d arg 0x1dbd47
+LOG ([5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG ([5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:877] Create MaceEngine from model graph proto and weights data
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:430] Creating MaceEngine, MACE version: v0.11.0-rc0-174-ga7beafb
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:469] Initializing MaceEngine
+utter1 打 给 幺 三 三 二 四 五 幺 二 四 七 八 
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:280) Decoded utterance utter1
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:36) Timing stats: total taken time was 7.22967 real-time factor was 1.12964 (note: this cannot be less than one.)
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:39) Average delay was 0.829671 seconds.
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:43) Percentage of time spent idling was 25.1798
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:45) Longest delay was 0.829671 seconds for utterance 'utter1'
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:286) Decoded 1 utterances, 0 with errors.
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:288) Overall likelihood per frame was 1.42922 per frame over 213 frames.
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:602] Destroying MaceEngine
+
+test-3:
+
+WARNING: linker: ./mace-online-decode: unused DT entry: type 0x1d arg 0xb38
+WARNING: linker: /data/local/tmp/libs/libkaldi-mace.so: unused DT entry: type 0x1d arg 0x1dbd47
+LOG ([5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG ([5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:877] Create MaceEngine from model graph proto and weights data
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:430] Creating MaceEngine, MACE version: v0.11.0-rc0-174-ga7beafb
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:469] Initializing MaceEngine
+utter1 拨打电话 幺 房 九 二 五 八 四 六 五 三 
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:280) Decoded utterance utter1
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:36) Timing stats: total taken time was 9.79909 real-time factor was 1.34603 (note: this cannot be less than one.)
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:39) Average delay was 2.51909 seconds.
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:43) Percentage of time spent idling was 19.2612
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:45) Longest delay was 2.51909 seconds for utterance 'utter1'
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:286) Decoded 1 utterances, 0 with errors.
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:288) Overall likelihood per frame was 1.34539 per frame over 242 frames.
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:602] Destroying MaceEngine
+
+
+
+
+test-4:
+
+WARNING: linker: ./mace-online-decode: unused DT entry: type 0x1d arg 0xb38
+WARNING: linker: /data/local/tmp/libs/libkaldi-mace.so: unused DT entry: type 0x1d arg 0x1dbd47
+LOG ([5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:183) Computing derived variables for iVector extractor
+LOG ([5.5.485~10-8d326]:ComputeDerivedVars():ivector-extractor.cc:204) Done.
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:877] Create MaceEngine from model graph proto and weights data
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:430] Creating MaceEngine, MACE version: v0.11.0-rc0-174-ga7beafb
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:469] Initializing MaceEngine
+utter1 帮我 拨打 幺 八六 零 零 七 
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:280) Decoded utterance utter1
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:36) Timing stats: total taken time was 10.8235 real-time factor was 1.75706 (note: this cannot be less than one.)
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:39) Average delay was 4.6635 seconds.
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:43) Percentage of time spent idling was 8.67718
+LOG ([5.5.485~10-8d326]:Print():online-timing.cc:45) Longest delay was 4.6635 seconds for utterance 'utter1'
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:286) Decoded 1 utterances, 0 with errors.
+LOG ([5.5.485~10-8d326]:MaceOnlineNnet3Decode():kaldi-mace.cc:288) Overall likelihood per frame was 0.935701 per frame over 205 frames.
+I /home/liutuo/workspace/AI/liutuo/mace/mace/libmace/mace.cc:602] Destroying MaceEngine
+
