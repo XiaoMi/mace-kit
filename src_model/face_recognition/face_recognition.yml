@@ -17,7 +17,7 @@ models:
           - face_recognition/MobileFaceNet/Logits/SpatialSqueeze
         output_shapes:
           - 1,128
-    runtime: gpu
+    runtime: cpu+gpu
     limit_opencl_kernel_time: 0
     obfuscate: 0
     winograd: 2
