@@ -27,7 +27,8 @@ enum {
 
 enum {
   DT_FLOAT32,
-  DT_UINT8
+  DT_UINT8,
+  DT_INT32
 };
 
 class MACEKIT_EXPORT Mat {
