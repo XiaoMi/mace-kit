@@ -3,5 +3,6 @@ add_subdirectory(util)
 
 add_subdirectory(face_detection)
 add_subdirectory(face_recognition)
-add_subdirectory(speech_recognition)
 add_subdirectory(object_detection)
+add_subdirectory(person_segmentation)
+add_subdirectory(speech_recognition)

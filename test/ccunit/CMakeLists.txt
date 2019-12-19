@@ -12,6 +12,7 @@ message("OpenCV_LIBS: ${OpenCV_LIBS}")
 
 add_subdirectory(face_detection)
 add_subdirectory(face_recognition)
-add_subdirectory(speech_recognition)
 add_subdirectory(object_detection)
+add_subdirectory(person_segmentation)
+add_subdirectory(speech_recognition)
 add_subdirectory(util)

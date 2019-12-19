@@ -35,13 +35,15 @@ for serialno in ${array[@]}; do
     adb -s $serialno push data/test/. /data/local/tmp/macekit/data/test
     adb -s $serialno push ${ANDROID_NDK_HOME}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a/libc++_shared.so /data/local/tmp/macekit/lib/libc++_shared.so
 
-    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; LD_LIBRARY_PATH=lib ./bin/face_detection_unitest")
+    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; MACE_INTERNAL_STORAGE_PATH=./ LD_LIBRARY_PATH=lib ./bin/face_detection_unitest")
     check_err "$OUTPUT"
-    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; LD_LIBRARY_PATH=lib ./bin/face_recognition_unitest")
+    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; MACE_INTERNAL_STORAGE_PATH=./ LD_LIBRARY_PATH=lib ./bin/face_recognition_unitest")
     check_err "$OUTPUT"
-    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; LD_LIBRARY_PATH=lib ./bin/speech_recognition_unitest")
+    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; MACE_INTERNAL_STORAGE_PATH=./ LD_LIBRARY_PATH=lib ./bin/speech_recognition_unitest")
     check_err "$OUTPUT"
-    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; LD_LIBRARY_PATH=lib ./bin/object_detection_unitest")
+    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; MACE_INTERNAL_STORAGE_PATH=./ LD_LIBRARY_PATH=lib ./bin/object_detection_unitest")
+    check_err "$OUTPUT"
+    OUTPUT=$(adb -s $serialno shell "cd /data/local/tmp/macekit; MACE_INTERNAL_STORAGE_PATH=./ LD_LIBRARY_PATH=lib ./bin/person_segmentation_unitest")
     check_err "$OUTPUT"
     adb -s $serialno shell "cd /data/local/tmp; rm -rf macekit"
 done
