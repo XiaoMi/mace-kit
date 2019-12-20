@@ -1,19 +1,16 @@
 MACE-Kit: a Machine Learning Toolkit Powered by MACE
 ====================================================
 
-In recent years, with the development of machine learning technology, 
-the on-device machine learning applications are getting more and more 
-popular on mobile phones or IoT devices.
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-For the AI application developers, it is efficient to use a great
-machine learning framework to develop AI applications. 
+近年来，随着机器学习技术的不断发展，人工智能应用实际落地变得越来越普遍。
 
-**MACE-Kit** provides various APIs for usage services, such as Face Detection and
-Recognition, Person Segmentation, Speech Recognition and so on.
-You can use these APIs to deploy your models and applications easily.
+对于人工智能应用开发者，基于性能出色的机器学习框架开发应用，
+可以大大减少开发工作量，提升工作效率。
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE) |
-[中文](README_zh.md)
+因此，**Mace-Kit**提供了一套易于上手的模型工具库，可以帮助开发者更加快速
+的实现一个人工智能应用，目前该工具提供了以下一些Demo API以供方便使用，
+并在不断完善中：
 
 Feature List
 -------------
@@ -23,11 +20,11 @@ Feature List
 - [x] Object Detection
 - [x] Person Segmentation
 - [x] Speech Recognition
-- [ ] ……
+- [ ] ...
 
-## Environment requirement
+## 准备环境
 
-| Software  | Installation command  | Tested version  |
+| 依赖  | 安装命令  | 验证可用的版本  |
 | :-------: | :-------------------: | :-------------: |
 | ADB  | apt-get install android-tools-adb  | Required by Android run, >= 1.0.32  |
 | Android NDK  | [NDK installation guide](https://developer.android.com/ndk/guides/setup#install) | Required by Android build, r17c |
